@@ -17,17 +17,17 @@ Use this checklist for the pilot distribution and every later release. Checking 
 - [x] Engineering audit of linked code is recorded in `THIRD-PARTY-REVIEW.md`; root `NOTICE` contains source-authentic third-party texts.
 - [x] Build embeds exact `LICENSE` and optional `NOTICE` bytes after stripping; tests and the pre-publication gate verify them.
 - [ ] Owner has reviewed the notice inventory, Linux evidence, and documented adapter provenance limitation before final approval.
-- [ ] The owner has set repository variable `DIRECTOR_COMPILER_LICENSE_SHA256` to the lowercase output of `sha256sum LICENSE`.
-- [ ] The owner has set `DIRECTOR_COMPILER_NOTICE_SHA256` to the lowercase output of `sha256sum NOTICE`.
-- [ ] Only after reviewing exact notice bytes and Linux CI logs, the owner sets **candidate-only** `DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED=true` and checks the downloaded candidate's `SHA256SUMS`, embedded texts and evidence.
+- [ ] The owner has set this repository's `LICENSE_SHA256` variable to the lowercase output of `sha256sum LICENSE`.
+- [ ] The owner has set this repository's `NOTICE_SHA256` variable to the lowercase output of `sha256sum NOTICE`.
+- [ ] After reviewing exact notice bytes and initial Linux CI logs, the owner commits `CI_ARTIFACT_UPLOAD_ENABLED: 'true'` in `verify.yml` and checks the next run's downloaded candidate, `SHA256SUMS`, embedded texts and evidence. No artifact-upload approval variable is used.
 - [ ] After reviewing the candidate, the owner has separately set repository variable `DIRECTOR_COMPILER_LICENSE_APPROVED` to exactly `true` for the GHCR/Release packaging decision.
 
 The workflow must fail before building a release if `LICENSE`, `NOTICE`, any approval variable, or either exact digest match is absent. Changing either licensing file invalidates approval. Do not add placeholder or guessed license text to pass this gate.
 
 ## Build and test
 
-- [ ] Standalone Ubuntu **Verify component** workflow passed without distribution variables; run URL and source commit recorded, Linux SDK/link/adapter evidence printed in logs reviewed against `THIRD-PARTY-REVIEW.md`.
-- [ ] Following candidate approval, a separate CI run uploaded the checksummed downloadable artifact with `LICENSE`/`NOTICE`; downloaded evidence and raw WASM notices pass exact-byte review.
+- [ ] Standalone Ubuntu **Verify component** workflow passed with the checked-in CI upload switch disabled; run URL and source commit recorded, Linux SDK/link/adapter evidence printed in logs reviewed against `THIRD-PARTY-REVIEW.md`.
+- [ ] Following the checked-in upload switch change and repo-scoped digest configuration, a separate CI run uploaded the checksummed downloadable artifact with `LICENSE`/`NOTICE`; downloaded evidence and raw WASM notices pass exact-byte review.
 - [ ] Branch-only manual `release.yml` passed on the intended commit, including `nix develop --command wkg --version` on Linux; no GHCR or GitHub Release publication occurred.
 
 - [ ] A clean checkout succeeds with `nix develop --command make test`.

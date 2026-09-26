@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # A downloadable GitHub Actions artifact is distribution, even without a tag.
 set -euo pipefail
-[[ "${APPROVED:-}" == true ]] || { echo 'CI artifact upload lacks explicit owner approval.' >&2; exit 1; }
 for file in LICENSE NOTICE; do
   [[ -s "$file" ]] || { echo "Missing/nonempty required text: $file" >&2; exit 1; }
 done

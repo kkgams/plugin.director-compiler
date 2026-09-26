@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# Checked-in distribution policy: change to 'true' only after reviewing the
+# first hosted Linux build. Later Units may start with 'true' after the pilot.
+env:
+  CI_ARTIFACT_UPLOAD_ENABLED: 'false'
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
@@ -19,6 +24,13 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
+
+      - name: Validate checked-in artifact distribution policy
+        run: |
+          case "$CI_ARTIFACT_UPLOAD_ENABLED" in
+            true|false) ;;
+            *) echo 'CI_ARTIFACT_UPLOAD_ENABLED must be true or false.' >&2; exit 1 ;;
+          esac
 
       - name: Validate release metadata and wiki inputs
         shell: bash
@@ -77,18 +89,18 @@ jobs:
           (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
 
-      # Downloadable Actions artifacts are distribution. A successful build
-      # alone does not authorize uploading the WASM or link evidence.
+      # Downloadable Actions artifacts are distribution. The checked-in switch
+      # AND exact repo-scoped licensing digests must both authorize staging.
       - name: Gate exact licensing bytes and stage CI candidate
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && vars.DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED == 'true'
+        id: candidate_gate
+        if: env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
         env:
-          APPROVED: ${{ vars.DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED }}
-          APPROVED_LICENSE_SHA256: ${{ vars.DIRECTOR_COMPILER_LICENSE_SHA256 }}
-          APPROVED_NOTICE_SHA256: ${{ vars.DIRECTOR_COMPILER_NOTICE_SHA256 }}
+          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
+          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
         run: bash scripts/check-artifact-approval.sh
 
-      - name: Upload owner-approved candidate and evidence (not a release)
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && vars.DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED == 'true'
+      - name: Upload checked-in-policy candidate and evidence (not a release)
+        if: steps.candidate_gate.outcome == 'success' && env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: director-compiler-verification-${{ github.sha }}
