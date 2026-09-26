@@ -7,7 +7,7 @@
   "files_sha256": {
     ".github/workflows/pages.yml": "7f4cd5f4fda4d4da7ae22b814eff90f6c6d108274c4bd572f9a21511a05ef29e",
     ".github/workflows/release.yml": "bd9000e195a27be5dce2d0e7f31545cd278b09fc396b5ca2557407bdd67f77d7",
-    ".github/workflows/verify.yml": "41cc05957b644dfd6106a75548e1838d04e2fcc52c9433f6fd28d6effe0d8a9f",
+    ".github/workflows/verify.yml": "64c6f7960647f13b6fc72477218b2bb876cffa6741656f2e57cff45215a5eadd",
     ".gitignore": "1168f025d11a3fb7dc3e43de6f1ada2683d6c8e1b461e811d6e32dbdca32bbd5",
     "CONTEXT.md": "9deb473c3905a2157966a279dfa46c48ac3507505726f17a77e1795d10d16d4f",
     "LICENSE": "3c6415b3c0107393c82ac760129bc570b09e1a03d8ffeef22783345f76da6aa7",
