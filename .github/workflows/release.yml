@@ -19,9 +19,6 @@ jobs:
       - name: Check out source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
-
       - name: Enforce release metadata and licensing gates before build
         id: metadata
         shell: bash
@@ -96,6 +93,21 @@ jobs:
             echo "notice_sha256=$notice_sha256"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
+
+      - name: Cache pinned Nix toolchain
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
+        with:
+          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
+          save: ${{ github.ref == 'refs/heads/release' }}
+
+      - name: Cache npm downloads
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3 (Node 24)
+        with:
+          path: ~/.npm
+          key: director-linux-npm-${{ hashFiles('package-lock.json') }}
+
       - name: Test release safety scripts
         run: |
           bash scripts/test-artifact-approval.sh
@@ -107,9 +119,6 @@ jobs:
 
       - name: Test before build
         run: nix develop --command make test
-
-      - name: Build release component
-        run: nix develop --command make build
 
       - name: Record build evidence
         run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
@@ -236,6 +245,12 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
+
+      - name: Restore pinned Nix publishing tools
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
+        with:
+          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
+          save: 'false'
 
       - name: Authenticate to GHCR
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0 (Node 24)

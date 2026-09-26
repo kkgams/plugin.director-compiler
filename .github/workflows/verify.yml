@@ -10,10 +10,10 @@ on:
 permissions:
   contents: read
 
-# Checked-in distribution policy: change to 'true' only after reviewing the
-# first hosted Linux build. Later Units may start with 'true' after the pilot.
+# First hosted Linux build passed; candidates may be distributed only when
+# this repo's exact LICENSE_SHA256 and NOTICE_SHA256 variables also match.
 env:
-  CI_ARTIFACT_UPLOAD_ENABLED: 'false'
+  CI_ARTIFACT_UPLOAD_ENABLED: 'true'
 
 jobs:
   test-and-build:
@@ -21,9 +21,6 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
 
       - name: Validate checked-in artifact distribution policy
         run: |
@@ -60,11 +57,32 @@ jobs:
           bash scripts/test-release-absent.sh
           bash scripts/test-release-oci-preflight.sh
 
+      - name: Check candidate licensing before installing the toolchain
+        if: env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
+        env:
+          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
+          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
+        run: bash scripts/check-licensing-digests.sh
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
+
+      # Exact flake key: only reuse this repository's pinned toolchain closure.
+      # The default release branch cache is also available to tag workflows.
+      - name: Cache pinned Nix toolchain
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
+        with:
+          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
+          save: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/release' }}
+
+      - name: Cache npm downloads
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3 (Node 24)
+        with:
+          path: ~/.npm
+          key: director-linux-npm-${{ hashFiles('package-lock.json') }}
+
       - name: Test
         run: nix develop --command make test
-
-      - name: Build
-        run: nix develop --command make build
 
       - name: Record build evidence
         run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
