@@ -1,0 +1,66 @@
+name: Deploy released documentation
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Require a matching published release tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          test "$GITHUB_REF" = "refs/tags/v${version}"
+          release_tag="$(gh release view "$GITHUB_REF_NAME" --json isDraft,isPrerelease,tagName \
+            --jq 'select(.isDraft == false and .isPrerelease == false) | .tagName')"
+          test "$release_tag" = "$GITHUB_REF_NAME"
+          test -f docs/_config.md
+          test -f docs/_sidebar.md
+          test "$(head -n 1 docs/index.md)" = '---'
+          test "$(head -n 1 docs/language.md)" = '---'
+          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
+            echo 'Extracted documentation contains a source-repository link.' >&2
+            exit 1
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Build wiki
+        id: wiki
+        uses: justgook/wiki@2b59699a9781130f481752c85329480301240ffa # v1.1.0
+        with:
+          source: docs
+          output: .wiki-dist
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: ${{ steps.wiki.outputs.path }}
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

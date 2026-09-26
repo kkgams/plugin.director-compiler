@@ -1,0 +1,74 @@
+name: Verify component
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+
+      - name: Validate release metadata and wiki inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
+          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test -s LICENSE
+          test -s NOTICE
+          test -f docs/_config.md
+          test -f docs/_sidebar.md
+          test -f docs/index.md
+          test -f docs/language.md
+          test "$(head -n 1 docs/index.md)" = '---'
+          test "$(head -n 1 docs/language.md)" = '---'
+          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
+            echo 'Extracted documentation contains a source-repository link.' >&2
+            exit 1
+          fi
+          printf 'Distribution %s; WIT %s\n' "$version" "$wit_version"
+
+      - name: Test OCI publication preflight with mocks
+        run: ./scripts/test-release-oci-preflight.sh
+
+      - name: Test
+        run: nix develop --command make test
+
+      - name: Build
+        run: nix develop --command make build
+
+      - name: Record build evidence
+        run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
+
+      - name: Verify and checksum component artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/director-compiler.wasm
+          (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
+          (cd dist && sha256sum --check SHA256SUMS)
+
+      - name: Upload verified candidate and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: director-compiler-verification-${{ github.sha }}
+          path: |
+            dist/director-compiler.wasm
+            dist/SHA256SUMS
+            dist/evidence/
+          if-no-files-found: error
+          retention-days: 7

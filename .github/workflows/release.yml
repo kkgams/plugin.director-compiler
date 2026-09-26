@@ -1,0 +1,278 @@
+name: Release component
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+
+      - name: Enforce release metadata and licensing gates before build
+        id: metadata
+        shell: bash
+        env:
+          LICENSE_APPROVED: ${{ vars.DIRECTOR_COMPILER_LICENSE_APPROVED }}
+          APPROVED_LICENSE_SHA256: ${{ vars.DIRECTOR_COMPILER_LICENSE_SHA256 }}
+          APPROVED_NOTICE_SHA256: ${{ vars.DIRECTOR_COMPILER_NOTICE_SHA256 }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
+          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test -f docs/_config.md
+          test -f docs/_sidebar.md
+          test "$(head -n 1 docs/index.md)" = '---'
+          test "$(head -n 1 docs/language.md)" = '---'
+          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
+            echo 'Extracted documentation contains a source-repository link.' >&2
+            exit 1
+          fi
+
+          if [[ ! -s LICENSE ]]; then
+            echo 'Publication blocked before build: root LICENSE is missing or empty.' >&2
+            exit 1
+          fi
+          if [[ ! -s NOTICE ]]; then
+            echo 'Publication blocked before build: root NOTICE is missing or empty.' >&2
+            exit 1
+          fi
+          if [[ "$LICENSE_APPROVED" != true ]]; then
+            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_LICENSE_APPROVED must be exactly true.' >&2
+            exit 1
+          fi
+          if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
+            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_LICENSE_SHA256 is missing.' >&2
+            exit 1
+          fi
+          if [[ ! "$APPROVED_LICENSE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_LICENSE_SHA256 must be a lowercase SHA-256 digest.' >&2
+            exit 1
+          fi
+          if [[ -z "$APPROVED_NOTICE_SHA256" ]]; then
+            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_NOTICE_SHA256 is missing.' >&2
+            exit 1
+          fi
+          if [[ ! "$APPROVED_NOTICE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_NOTICE_SHA256 must be a lowercase SHA-256 digest.' >&2
+            exit 1
+          fi
+          license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
+          notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
+          if [[ "$license_sha256" != "$APPROVED_LICENSE_SHA256" ]]; then
+            echo "Publication blocked before build: LICENSE digest $license_sha256 does not match DIRECTOR_COMPILER_LICENSE_SHA256." >&2
+            exit 1
+          fi
+          if [[ "$notice_sha256" != "$APPROVED_NOTICE_SHA256" ]]; then
+            echo "Publication blocked before build: NOTICE digest $notice_sha256 does not match DIRECTOR_COMPILER_NOTICE_SHA256." >&2
+            exit 1
+          fi
+          {
+            echo "version=$version"
+            echo "wit_version=$wit_version"
+            echo "license_sha256=$license_sha256"
+            echo "notice_sha256=$notice_sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Test release safety scripts
+        run: ./scripts/test-release-oci-preflight.sh
+
+      - name: Test before build
+        run: nix develop --command make test
+
+      - name: Build release component
+        run: nix develop --command make build
+
+      - name: Record build evidence
+        run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
+
+      - name: Stage and checksum artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/director-compiler.wasm
+          (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
+          (cd dist && sha256sum --check SHA256SUMS)
+
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: director-compiler-${{ steps.metadata.outputs.version }}
+          path: |
+            dist/director-compiler.wasm
+            dist/SHA256SUMS
+            dist/evidence/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Enforce version, ref, and licensing gates
+        id: metadata
+        shell: bash
+        env:
+          LICENSE_APPROVED: ${{ vars.DIRECTOR_COMPILER_LICENSE_APPROVED }}
+          APPROVED_LICENSE_SHA256: ${{ vars.DIRECTOR_COMPILER_LICENSE_SHA256 }}
+          APPROVED_NOTICE_SHA256: ${{ vars.DIRECTOR_COMPILER_NOTICE_SHA256 }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < version.txt)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$GITHUB_REF" = "refs/tags/v${version}"
+
+          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
+          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+          if [[ ! -s LICENSE ]]; then
+            echo 'Publication blocked: root LICENSE is missing or empty.' >&2
+            exit 1
+          fi
+          if [[ ! -s NOTICE ]]; then
+            echo 'Publication blocked: root NOTICE is missing or empty.' >&2
+            exit 1
+          fi
+          if [[ "$LICENSE_APPROVED" != true ]]; then
+            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_LICENSE_APPROVED must be exactly true.' >&2
+            exit 1
+          fi
+          if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
+            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_LICENSE_SHA256 is missing.' >&2
+            exit 1
+          fi
+          if [[ ! "$APPROVED_LICENSE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_LICENSE_SHA256 must be a lowercase SHA-256 digest.' >&2
+            exit 1
+          fi
+          if [[ -z "$APPROVED_NOTICE_SHA256" ]]; then
+            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_NOTICE_SHA256 is missing.' >&2
+            exit 1
+          fi
+          if [[ ! "$APPROVED_NOTICE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_NOTICE_SHA256 must be a lowercase SHA-256 digest.' >&2
+            exit 1
+          fi
+          license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
+          notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
+          if [[ "$license_sha256" != "$APPROVED_LICENSE_SHA256" ]]; then
+            echo "Publication blocked: LICENSE digest $license_sha256 does not match DIRECTOR_COMPILER_LICENSE_SHA256." >&2
+            exit 1
+          fi
+          if [[ "$notice_sha256" != "$APPROVED_NOTICE_SHA256" ]]; then
+            echo "Publication blocked: NOTICE digest $notice_sha256 does not match DIRECTOR_COMPILER_NOTICE_SHA256." >&2
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "wit_version=$wit_version"
+            echo "license_sha256=$license_sha256"
+            echo "notice_sha256=$notice_sha256"
+            echo "oci_ref=ghcr.io/kkgams/gams/director-compiler:${version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to replace an existing GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; refusing to replace it." >&2
+            exit 1
+          fi
+
+      - name: Download verified release candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: director-compiler-${{ steps.metadata.outputs.version }}
+          path: dist
+
+      - name: Recheck downloaded artifact and stage licensing assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum --check SHA256SUMS)
+          python3 scripts/wasm-notices.py verify dist/director-compiler.wasm \
+            --license LICENSE --notice NOTICE
+          cp LICENSE NOTICE dist/
+          (cd dist && sha256sum director-compiler.wasm LICENSE NOTICE > SHA256SUMS && sha256sum --check SHA256SUMS)
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check whether the exact OCI version may be pushed
+        id: oci_preflight
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OCI_REF: ${{ steps.metadata.outputs.oci_ref }}
+        run: nix develop --command ./scripts/release-oci-preflight.sh "$OCI_REF" dist/director-compiler.wasm
+
+      - name: Publish exact version to GHCR
+        if: steps.oci_preflight.outputs.should_push == 'true'
+        run: nix develop --command wkg oci push "${{ steps.metadata.outputs.oci_ref }}" dist/director-compiler.wasm
+
+      - name: Create checksummed GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+          WIT_VERSION: ${{ steps.metadata.outputs.wit_version }}
+          OCI_REF: ${{ steps.metadata.outputs.oci_ref }}
+          LICENSE_SHA256: ${{ steps.metadata.outputs.license_sha256 }}
+          NOTICE_SHA256: ${{ steps.metadata.outputs.notice_sha256 }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          Director Compiler pilot distribution **${VERSION}** exposes WIT package **gams:director-compiler@${WIT_VERSION}**.
+
+          OCI artifact: \`${OCI_REF}\`
+          Owner-approved LICENSE SHA-256: \`${LICENSE_SHA256}\`
+          Owner-approved NOTICE SHA-256: \`${NOTICE_SHA256}\`
+
+          This pilot does not implement every accepted Director language v1 feature. See the released language documentation for the exact implementation status, including structured value paths, nested matcher link values, matcher continuations, declaration/rule interleaving, and complete diagnostic recovery.
+          EOF
+          release_assets=(dist/director-compiler.wasm dist/LICENSE dist/NOTICE dist/SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "Director Compiler ${VERSION}" \
+            --notes-file release-notes.md \
+            "${release_assets[@]}"
+
+  deploy-docs:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
