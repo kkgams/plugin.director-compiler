@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
 
       - name: Enforce release metadata and licensing gates before build
         id: metadata
@@ -31,8 +31,15 @@ jobs:
           APPROVED_NOTICE_SHA256: ${{ vars.DIRECTOR_COMPILER_NOTICE_SHA256 }}
         run: |
           set -euo pipefail
+          test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
           version="$(tr -d '[:space:]' < version.txt)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "$GITHUB_REF" = "refs/tags/v${version}"
+          else
+            test "$GITHUB_EVENT_NAME" = workflow_dispatch
+            test "$GITHUB_REF_TYPE" = branch
+          fi
           wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
           [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test -f docs/_config.md
@@ -90,7 +97,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Test release safety scripts
-        run: ./scripts/test-release-oci-preflight.sh
+        run: |
+          bash scripts/test-artifact-approval.sh
+          bash scripts/test-release-absent.sh
+          bash scripts/test-release-oci-preflight.sh
+
+      - name: Verify the Linux publishing toolchain without publishing
+        run: nix develop --command wkg --version
 
       - name: Test before build
         run: nix develop --command make test
@@ -101,20 +114,23 @@ jobs:
       - name: Record build evidence
         run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
 
-      - name: Stage and checksum artifact
+      - name: Stage and checksum exact licensed component
         shell: bash
         run: |
           set -euo pipefail
           test -s dist/director-compiler.wasm
-          (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
-          (cd dist && sha256sum --check SHA256SUMS)
+          python3 scripts/wasm-notices.py verify dist/director-compiler.wasm --license LICENSE --notice NOTICE
+          cp LICENSE NOTICE dist/
+          (cd dist && sha256sum director-compiler.wasm LICENSE NOTICE > SHA256SUMS && sha256sum --check SHA256SUMS)
 
       - name: Upload verified release candidate
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: director-compiler-${{ steps.metadata.outputs.version }}
           path: |
             dist/director-compiler.wasm
+            dist/LICENSE
+            dist/NOTICE
             dist/SHA256SUMS
             dist/evidence/
           if-no-files-found: error
@@ -129,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out release tag
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
 
       - name: Enforce version, ref, and licensing gates
         id: metadata
@@ -140,6 +156,7 @@ jobs:
           APPROVED_NOTICE_SHA256: ${{ vars.DIRECTOR_COMPILER_NOTICE_SHA256 }}
         run: |
           set -euo pipefail
+          test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
           version="$(tr -d '[:space:]' < version.txt)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$GITHUB_REF" = "refs/tags/v${version}"
@@ -194,17 +211,13 @@ jobs:
             echo "oci_ref=ghcr.io/kkgams/gams/director-compiler:${version}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Refuse to replace an existing GitHub Release
+      - name: Refuse an existing GitHub Release (only 404 is absence)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "Release $GITHUB_REF_NAME already exists; refusing to replace it." >&2
-            exit 1
-          fi
+        run: bash scripts/check-release-absent.sh
 
       - name: Download verified release candidate
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           name: director-compiler-${{ steps.metadata.outputs.version }}
           path: dist
@@ -214,16 +227,18 @@ jobs:
         run: |
           set -euo pipefail
           (cd dist && sha256sum --check SHA256SUMS)
+          cmp dist/LICENSE LICENSE
+          cmp dist/NOTICE NOTICE
           python3 scripts/wasm-notices.py verify dist/director-compiler.wasm \
             --license LICENSE --notice NOTICE
           cp LICENSE NOTICE dist/
           (cd dist && sha256sum director-compiler.wasm LICENSE NOTICE > SHA256SUMS && sha256sum --check SHA256SUMS)
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
 
       - name: Authenticate to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0 (Node 24)
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -263,7 +278,7 @@ jobs:
           EOF
           release_assets=(dist/director-compiler.wasm dist/LICENSE dist/NOTICE dist/SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" \
-            --verify-tag \
+            --verify-tag --latest=false \
             --title "Director Compiler ${VERSION}" \
             --notes-file release-notes.md \
             "${release_assets[@]}"

@@ -19,11 +19,13 @@ Distribution and WIT versions are deliberately separate. The workflow derives th
 
 ### `verify.yml`
 
-Runs for pull requests, branch pushes, and manual dispatch on Ubuntu. It installs Nix, runs `make test`, OCI preflight mock tests, and `make build`. It uploads the candidate plus `dist/evidence/`: SDK identity, tool versions, licensing/artifact hashes, a linker map, and module metadata. The evidence link is repackaged and compared byte-for-byte against the candidate. It has read-only repository permissions and cannot publish; no approval variables are needed.
+Runs for pull requests, `release` branch pushes, and manual dispatch on Ubuntu. It installs Nix, runs `make test`, mocked candidate/OCI/GitHub Release gates, and `make build`. The Nix shell builds pinned `wkg` with only its upstream network-dependent integration test skipped; all offline Rust checks remain enabled. The build evidence is generated and the SDK/link/module summary is printed in CI logs **without distributing** binaries. The inspected link is repackaged and compared byte-for-byte against the candidate. It has read-only repository permissions and cannot publish.
+
+A downloadable Actions artifact **is distribution**, so the candidate plus `LICENSE`, `NOTICE`, `SHA256SUMS` and `dist/evidence/` is uploaded only for `release` branch runs when the owner sets `DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED=true` and both digest variables match exact root licensing bytes. `scripts/check-artifact-approval.sh` verifies the embedded bytes and checksums before upload. PR runs never upload, and an initial Linux verification run needs no approval variables. Candidate approval does not grant GHCR or GitHub Release approval.
 
 ### `release.yml`
 
-Runs for `v*` tags or manually. Runs for the same workflow/ref are serialized and are never canceled in progress. Its verification job tests the mocked OCI safety paths before building and stages a checksummed artifact. The publication job runs only from a tag and then:
+Runs for `v*` tags or manually. Runs for the same workflow/ref are serialized and are never canceled in progress. Its verification job tests the mocked OCI/GitHub Release safety paths, builds the pinned `wkg` in the Linux release shell on **manual branch runs** (without publishing), then builds/tests and stages a checksummed component with separate exact LICENSE and NOTICE assets. The publication job runs only from a tag and then:
 
 1. verifies `refs/tags/v<version.txt>`;
 2. verifies the WIT package declaration;
@@ -34,13 +36,13 @@ Runs for `v*` tags or manually. Runs for the same workflow/ref are serialized an
 7. pushes only when the registry explicitly returns `404`; if the tag exists, pulls it and skips the push only when its component bytes exactly match, otherwise fails;
 8. creates the matching GitHub Release with the component, checksum manifest, `LICENSE`, and applicable `NOTICE`.
 
-Authentication failures, transport failures, malformed responses, and registry statuses other than the expected `200`/`404` are failures, never evidence that a tag is absent. This makes a retry after an interrupted release safe: an identical existing OCI artifact is retained, while a different artifact can never be overwritten by the workflow. A GitHub Release that already exists is still a hard failure and requires owner review.
+Authentication failures, transport failures, malformed responses, and registry statuses other than the expected `200`/`404` are failures, never evidence that a tag is absent. This makes a retry after an interrupted release safe: an identical existing OCI artifact is retained, while a different artifact can never be overwritten by the workflow. A GitHub Release that already exists is still a hard failure and requires owner review; only an explicit GitHub API `404` is treated as absence. Failed authentication, transport errors and other statuses cannot authorize publication.
 
-A manual run on a branch is a verification-only run. A manual run intended to publish must select an existing release tag as its ref and still pass every gate.
+A manual run on a branch performs the gated build and uploads a **downloadable, owner-approved release candidate**, but does not push GHCR or create a GitHub Release. A manual run intended to publish must select an existing release tag as its ref and still pass every gate.
 
 ### `pages.yml`
 
-Builds and deploys the repository-owned wiki from `docs/` for a published release. The release workflow calls it after creating the checksummed release; owner-created `release.published` events can also run it. A manual run must select an existing published release tag; branch refs fail. This makes released documentation, not development-branch documentation, the default Pages deployment. The workflow uses the actual `justgook/wiki` action API: `source`, `output`, and its `path` output. Aggregate ecosystem documentation belongs elsewhere and is not implemented here.
+Builds and deploys the repository-owned wiki from `docs/` for a published release. The release workflow calls it after creating the checksummed release; it does **not** also run from `release.published` (which would race/cancel the reusable Pages run). A manual run must select an existing published release tag; branch refs fail. This makes released documentation, not development-branch documentation, the default Pages deployment. The workflow uses the actual `justgook/wiki` action API: `source`, `output`, and its `path` output. Aggregate ecosystem documentation belongs elsewhere and is not implemented here.
 
 ## Required owner setup
 
@@ -49,7 +51,7 @@ No credentials should be shared with automation authors or local tooling. A repo
 1. review the owner-selected MIT license at root `LICENSE` and its copyright attribution;
 2. review root `NOTICE` and `THIRD-PARTY-REVIEW.md`, including the SDK adapter provenance limitation and Linux evidence;
 3. verify the built raw-WASM OCI artifact: `gams.license` must match `LICENSE`, and `gams.notice` must match `NOTICE` when present. The build embeds these after stripping; tests and the downloaded-artifact release gate check exact bytes. Review the complete linked dependency notice inventory before final approval;
-4. compute `sha256sum LICENSE NOTICE`; set `DIRECTOR_COMPILER_LICENSE_SHA256` and `DIRECTOR_COMPILER_NOTICE_SHA256` to their respective lowercase digests. Set `DIRECTOR_COMPILER_LICENSE_APPROVED=true` only after approving both exact texts and the raw-OCI packaging decision;
+4. compute `sha256sum LICENSE NOTICE`; set `DIRECTOR_COMPILER_LICENSE_SHA256` and `DIRECTOR_COMPILER_NOTICE_SHA256` to their respective lowercase digests. When approving a downloadable CI candidate, set **separate** `DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED=true` and rerun `verify.yml` on `release`. After inspecting that downloaded candidate and its Linux evidence, set `DIRECTOR_COMPILER_LICENSE_APPROVED=true` only if approving GHCR/GitHub Release packaging;
 5. enable GitHub Actions as the Pages source;
 6. review the `github-pages` and `release` environment protection settings, if used;
 7. confirm `GITHUB_TOKEN` may write organization packages and create releases;
@@ -91,6 +93,6 @@ test -s dist/director-compiler.wasm
 ./scripts/test-release-oci-preflight.sh
 ```
 
-For actual Linux validation, the owner must push the assembled standalone repository to a branch (not a release tag), open **Actions → Verify component → Run workflow**, and wait for success. No licensing-approval variables need to be enabled. Download its candidate/evidence artifact, review `wasi-sdk-VERSION`, linker members and adapter producer metadata against `THIRD-PARTY-REVIEW.md`, and record the run URL and source commit. Local macOS success or workflow linting is not Linux execution evidence.
+For actual Linux validation, the owner pushes `release` (not a release tag) and waits for **Verify component** to pass. No variables are needed for this build-only run: review the SDK VERSION, toolchain, link map and adapter producer metadata printed in its logs against `THIRD-PARTY-REVIEW.md`. To download candidate/evidence, the owner sets the two exact SHA-256 digest variables and **candidate-only** approval variable as described above, then reruns `verify.yml` on `release`. Check all three payloads with `sha256sum --check SHA256SUMS`, validate the WASM and its embedded texts, and record run URL/source commit. Local macOS success or linting is not Linux execution evidence.
 
-Then complete [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md). Only the owner should create/push the release tag after the licensing gate is genuinely satisfied.
+Only after reviewing the candidate, the owner sets the separate `DIRECTOR_COMPILER_LICENSE_APPROVED=true` release variable and manually runs `release.yml` **on the branch**: it now verifies the release shell and `wkg` on hosted Linux without publishing. Complete [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md). The owner alone creates/pushes `v0.1.0` on that verified commit. Its tag workflow can push GHCR and create the GitHub Release; Pages deployment additionally requires the owner to configure the Pages environment/source. No retagging a failed pushed version to pick up later workflow fixes.

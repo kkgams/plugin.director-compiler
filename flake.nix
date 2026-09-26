@@ -161,6 +161,9 @@
             };
             cargoBuildFlags = [ "-p" "wkg" ];
             cargoTestFlags = [ "-p" "wkg" "--no-default-features" ];
+            # Upstream e2e::check fetches a public registry; Nix builds have
+            # no network. Keep every other offline Rust check enabled.
+            checkFlags = [ "--skip=check" ];
           };
         in {
           default = pkgs.mkShell {

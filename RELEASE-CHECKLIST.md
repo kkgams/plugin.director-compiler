@@ -19,13 +19,16 @@ Use this checklist for the pilot distribution and every later release. Checking 
 - [ ] Owner has reviewed the notice inventory, Linux evidence, and documented adapter provenance limitation before final approval.
 - [ ] The owner has set repository variable `DIRECTOR_COMPILER_LICENSE_SHA256` to the lowercase output of `sha256sum LICENSE`.
 - [ ] The owner has set `DIRECTOR_COMPILER_NOTICE_SHA256` to the lowercase output of `sha256sum NOTICE`.
-- [ ] The owner has set repository variable `DIRECTOR_COMPILER_LICENSE_APPROVED` to exactly `true` for both exact digests and the packaging decision.
+- [ ] Only after reviewing exact notice bytes and Linux CI logs, the owner sets **candidate-only** `DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED=true` and checks the downloaded candidate's `SHA256SUMS`, embedded texts and evidence.
+- [ ] After reviewing the candidate, the owner has separately set repository variable `DIRECTOR_COMPILER_LICENSE_APPROVED` to exactly `true` for the GHCR/Release packaging decision.
 
 The workflow must fail before building a release if `LICENSE`, `NOTICE`, any approval variable, or either exact digest match is absent. Changing either licensing file invalidates approval. Do not add placeholder or guessed license text to pass this gate.
 
 ## Build and test
 
-- [ ] Standalone Ubuntu **Verify component** workflow passed; run URL and source commit recorded, downloaded link/SDK evidence reviewed against `THIRD-PARTY-REVIEW.md`.
+- [ ] Standalone Ubuntu **Verify component** workflow passed without distribution variables; run URL and source commit recorded, Linux SDK/link/adapter evidence printed in logs reviewed against `THIRD-PARTY-REVIEW.md`.
+- [ ] Following candidate approval, a separate CI run uploaded the checksummed downloadable artifact with `LICENSE`/`NOTICE`; downloaded evidence and raw WASM notices pass exact-byte review.
+- [ ] Branch-only manual `release.yml` passed on the intended commit, including `nix develop --command wkg --version` on Linux; no GHCR or GitHub Release publication occurred.
 
 - [ ] A clean checkout succeeds with `nix develop --command make test`.
 - [ ] A clean checkout succeeds with `nix develop --command make build`.

@@ -62,4 +62,4 @@ Verify a downloaded artifact against this release's license files:
 python3 scripts/wasm-notices.py verify dist/director-compiler.wasm --license LICENSE --notice NOTICE
 ```
 
-The build/tests and publication workflow verify exact embedded bytes. The engineering notice audit is in [`THIRD-PARTY-REVIEW.md`](./THIRD-PARTY-REVIEW.md). Actual Linux verification and digest-bound owner approval of both `LICENSE` and `NOTICE` remain required. See [`PUBLISHING.md`](./PUBLISHING.md).
+The build/tests and publication workflow verify exact embedded bytes. The engineering notice audit is in [`THIRD-PARTY-REVIEW.md`](./THIRD-PARTY-REVIEW.md). Public CI logs can supply initial Linux SDK/link evidence without distributing a WASM. A downloadable Actions candidate needs **separate owner approval** (`DIRECTOR_COMPILER_ARTIFACT_UPLOAD_APPROVED=true` plus both exact LICENSE/NOTICE digest variables); GHCR/GitHub Release additionally needs `DIRECTOR_COMPILER_LICENSE_APPROVED=true` and a successful branch-only release dry run. Actual hosted Linux verification and digest-bound owner approval remain required. See [`PUBLISHING.md`](./PUBLISHING.md).
