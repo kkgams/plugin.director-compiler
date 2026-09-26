@@ -25,7 +25,7 @@
     "docs/index.md": "257ff37540ed4bc7f71b09f0498bb13579845f72705efae0f7104bd9f99487c0",
     "docs/language.md": "ca085691ee836d8bb74d51ffb2f18ddbb250529d785578c1a7fde06036781750",
     "flake.lock": "f4eeef56deb209afbca6947807cf700129c325ac9f6eb014ae44b0981b9238e2",
-    "flake.nix": "b219d1445e3b52dc073483d348459c61a9f11e08c2cf53bccd0432f50386632c",
+    "flake.nix": "297a0cceab6331d199130ab4bd67713760072fc325c6e52649020003dddb43ae",
     "json_writer.odin": "c59c0a7924bff3bb46c826a7bd449b48619968b690976f5a60c702da281d7dd0",
     "lexer.odin": "db4f59a46c46c4c62dd3c62b22a975782c6fdd8b99efa5e11246f50a54aed53f",
     "package-lock.json": "16ecbbca18ee486ab53f93530e89b31adde8ca78dbd67eb0b6e76e5c97dc58c0",
