@@ -36,8 +36,9 @@ jobs:
           test "$release_tag" = "$GITHUB_REF_NAME"
           test -f docs/_config.md
           test -f docs/_sidebar.md
-          test "$(head -n 1 docs/index.md)" = '---'
-          test "$(head -n 1 docs/language.md)" = '---'
+          test "$(head -n 1 docs/director-compiler.md)" = '---'
+          test "$(head -n 1 docs/director-language.md)" = '---'
+          grep -qx 'status: in-progress' docs/director-language.md
           if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
             echo 'Extracted documentation contains a source-repository link.' >&2
             exit 1

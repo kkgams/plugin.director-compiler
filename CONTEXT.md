@@ -26,7 +26,7 @@ A source error containing a stable code, human-readable message, and source span
 - The caller owns reading source, writing output, and any later resource-packing step.
 - The Director Compiler API is pure and does not read Project Config. Its linked WASM artifact has standard WASI SDK runtime imports, including filesystem interfaces; these are distinct from authored GAMS plugin dependencies.
 - Distribution Version `0.1.0` exposes WIT Interface Version `1.0.0`; neither number asserts complete implementation of all accepted Director v1 language behavior.
-- `docs/language.md` documents both accepted syntax and explicit implementation gaps.
+- `docs/director-language.md` documents both accepted syntax and explicit implementation gaps.
 
 ## Current ambiguity
 

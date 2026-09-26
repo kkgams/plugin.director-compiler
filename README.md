@@ -12,7 +12,7 @@ The distribution version and WIT interface version are independent. A `0.1.0` pi
 
 ## Implementation status
 
-This pilot implements the core tracer bullet, including entities, direct matchers, rules, common changes, deterministic JSON, and structured diagnostics. Accepted v1 work remains incomplete, notably structured value paths, nested matcher link values, matcher continuations, declaration/rule interleaving, and complete diagnostic recovery. See [Director language and implementation status](./docs/language.md) for the exact current list.
+This pilot implements the core tracer bullet, including entities, direct matchers, rules, common changes, deterministic JSON, and structured diagnostics. Accepted v1 work remains incomplete, notably structured value paths, nested matcher link values, matcher continuations, declaration/rule interleaving, and complete diagnostic recovery. See [Director language and implementation status](./docs/director-language.md) for the exact current list.
 
 Do not describe this distribution as a complete implementation of Director language v1 merely because its WIT contract is `1.0.0`.
 
@@ -45,7 +45,7 @@ Successful compilation returns Director IR as JSON text. Invalid source returns 
 
 ## Documentation
 
-- [Director language and current implementation status](./docs/language.md)
+- [Director language and current implementation status](./docs/director-language.md)
 - [Release checklist](./RELEASE-CHECKLIST.md)
 - [Publishing and validation notes](./PUBLISHING.md)
 - [Repository context](./CONTEXT.md)

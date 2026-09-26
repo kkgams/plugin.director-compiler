@@ -1,0 +1,82 @@
+name: Repair v0.1.0 released documentation
+
+# Docs-only rescue for the immutable v0.1.0 tag. Workflow code runs from
+# release; the Markdown itself is checked out from the published tag.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repair workflow source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
+        with:
+          persist-credentials: false
+
+      - name: Require the owner-selected repair branch
+        run: |
+          test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
+          test "$GITHUB_REF" = refs/heads/release
+          test -f scripts/repair-v0.1.0-wiki.py
+
+      - name: Check out published v0.1.0 documentation
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
+        with:
+          ref: v0.1.0
+          path: published
+          persist-credentials: false
+
+      - name: Require the original published tag and docs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C published rev-parse HEAD)" = 0dbd3246dd2b4f1230a8942680211f47b9fbed45
+          test "$(tr -d '[:space:]' < published/version.txt)" = 0.1.0
+          release_tag="$(gh release view v0.1.0 --json isDraft,isPrerelease,tagName \
+            --jq 'select(.isDraft == false and .isPrerelease == false) | .tagName')"
+          test "$release_tag" = v0.1.0
+          test -s published/docs/index.md
+          test -s published/docs/language.md
+
+      - name: Test the v0.1.0 route repair
+        run: python3 test/test_wiki_repair.py
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0 (Node 24)
+
+      - name: Build documentation from the published tag
+        id: wiki
+        uses: justgook/wiki@2b59699a9781130f481752c85329480301240ffa # v1.1.0
+        with:
+          source: published/docs
+          output: .wiki-dist
+
+      - name: Repair only the generated wiki routes
+        env:
+          SITE_PATH: ${{ steps.wiki.outputs.path }}
+        run: python3 scripts/repair-v0.1.0-wiki.py "$SITE_PATH"
+
+      - name: Upload repaired Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0 (Node 24 composite)
+        with:
+          path: ${{ steps.wiki.outputs.path }}
+          include-hidden-files: 'true'
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0 (Node 24)

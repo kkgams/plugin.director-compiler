@@ -90,6 +90,7 @@ $(TRANSPILED): $(COMPONENT) node_modules/.package-lock.json
 
 test: check-tools $(TRANSPILED)
 	@python3 test/test_wasm_notices.py
+	@python3 test/test_wiki_repair.py
 	@$(WASM_TOOLS) validate "$(COMPONENT)"
 	@notice_args=(); if [ -f NOTICE ]; then notice_args=(--notice NOTICE); fi
 	@python3 scripts/wasm-notices.py verify "$(COMPONENT)" --license LICENSE "$${notice_args[@]}"

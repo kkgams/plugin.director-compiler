@@ -44,6 +44,18 @@ A manual run on a branch performs the digest-gated build and uploads a **downloa
 
 Builds and deploys the repository-owned wiki from `docs/` for a published release. The release workflow calls it after creating the checksummed release; it does **not** also run from `release.published` (which would race/cancel the reusable Pages run). A manual run must select an existing published release tag; branch refs fail. This makes released documentation, not development-branch documentation, the default Pages deployment. The workflow uses the actual `justgook/wiki` action API: `source`, `output`, and its `path` output. Aggregate ecosystem documentation belongs elsewhere and is not implemented here.
 
+### Repair the already-published `v0.1.0` wiki without a new component release
+
+`v0.1.0` is immutable and its published component must not be retagged or republished. Its wiki sidebar links to `#/director-compiler` and `#/director-language`, but the tagged source names the pages `index.md` and `language.md`; the language page also lacks the wiki runtime's required `status` frontmatter. The **manual** `repair-pages-v0.1.0.yml` workflow runs from `release` (the existing permitted Pages environment branch), checks out the original `v0.1.0` tag separately and verifies its exact commit and published GitHub Release. It builds that tagged Markdown with the pinned wiki action, adds only generated-site route aliases and status, then deploys **Pages only**. It does not modify the tag, upload a new component, push GHCR, or create a GitHub Release. It fails loudly if the tag/source/site shape differs from the reviewed version.
+
+After pushing this docs-only fix, the owner runs:
+
+```sh
+gh workflow run repair-pages-v0.1.0.yml -R kkgams/plugin.director-compiler --ref release
+```
+
+Once it passes, check `https://kkgams.github.io/plugin.director-compiler/#/director-language` and the Overview link. Do **not** rerun the release workflow: the existing-release safeguard must reject duplicate publication. Future version tags use the corrected canonical filenames in the source rather than this one-off repair.
+
 ## Required owner setup
 
 No credentials should be shared with automation authors or local tooling. A repository owner must:
@@ -64,17 +76,17 @@ Changing either `LICENSE` or `NOTICE` invalidates candidate and release distribu
 - The source boundary is standalone: root `*.odin`, `component.c`, and `wit/` are copied into the distribution repository.
 - The authored WIT contract has no imports. Inspection of the linked artifact found WASI 0.2.6 SDK runtime imports, including filesystem types/preopens; see README for the exact inventory. Consumers must supply these standard interfaces.
 - The pilot versions are explicit and non-equivalent: Distribution `0.1.0`, WIT `1.0.0`.
-- The source overview identifies implemented tracer-bullet behavior and accepted v1 gaps. The extracted `docs/language.md` must be copied from that overview so status wording does not drift.
+- The source overview identifies implemented tracer-bullet behavior and accepted v1 gaps. The extracted `docs/director-language.md` must be copied from that overview so status wording does not drift.
 - The component artifact has one canonical filename, `director-compiler.wasm`; the final GitHub Release SHA-256 manifest also covers `LICENSE` and applicable `NOTICE`.
 - Build/test commands are repository-local (`make test`, `make build`) and run through `nix develop` in CI.
 - Workflow actions are pinned to full reachable commits and permissions are scoped per job.
-- All three workflow files pass `actionlint` after placing the template at repository root.
-- The wiki action's v1.1.0 API and required `_config.md` / `_sidebar.md` files were checked against `justgook/wiki`'s actual `action.yml` and build script. A local assembly smoke test produced `_config.md`, `_sidebar.md`, `index.md`, and `language.md` in the built site's content directory.
+- All four workflow files pass `actionlint` after placing the template at repository root.
+- The wiki action's v1.1.0 API and required `_config.md` / `_sidebar.md` files were checked against `justgook/wiki`'s actual `action.yml` and build script. The release-pilot smoke test exposed a routing bug: wiki links used title slugs while files were named `index.md` and `language.md`; the language page also lacked required `status` metadata. Current extraction uses `director-compiler.md` and `director-language.md`, with explicit status and matching wiki routes. A docs-only recovery workflow republishes corrected generated pages for the immutable `v0.1.0` source.
 
 ## Known gaps / release blockers
 
 - **Blocking:** Engineering notice review and embedding are implemented. Owner approval of the reviewed texts, provenance limitations, and distribution packaging is still pending.
-- The accepted Director v1 language is not fully implemented. Current omissions are documented in `docs/language.md`; release notes must not imply otherwise.
+- The accepted Director v1 language is not fully implemented. Current omissions are documented in `docs/director-language.md`; release notes must not imply otherwise.
 - The extraction must be exercised in a fresh standalone checkout on GitHub's Linux runner; validation inside the source repository is not a substitute.
 - GHCR push, GitHub Release creation, package visibility, and Pages deployment require owner-controlled GitHub settings and have not been executed by this preparation.
 - The public aggregate documentation site is deferred; this repository publishes only its own released documentation.
