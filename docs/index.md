@@ -35,7 +35,7 @@ The core compiler tracer bullet is implemented, but accepted Director v1 behavio
 
 ## Availability
 
-Publication is blocked pending a real license decision by the copyright owner. No placeholder license will be supplied. When approved, released artifacts are intended to include:
+The owner selected MIT for this repository. Release publication requires the matching owner-pushed tag and exact `LICENSE`/`NOTICE` digests, with notices embedded in the component. Released artifacts include:
 
 - `director-compiler.wasm` and `SHA256SUMS` on the matching GitHub Release;
 - the same component at the exact versioned GHCR reference above.

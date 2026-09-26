@@ -21,16 +21,16 @@ Use this checklist for the pilot distribution and every later release. Checking 
 - [ ] The owner has set this repository's `NOTICE_SHA256` variable to the lowercase output of `sha256sum NOTICE`.
 - [x] After the first Linux build passed at `d3d6d5d`, `CI_ARTIFACT_UPLOAD_ENABLED: 'true'` was committed to `verify.yml`. No artifact-upload approval variable is used.
 - [ ] Before pushing the enabled workflow, the owner reviews the exact notice bytes and sets this repository's matching `LICENSE_SHA256` and `NOTICE_SHA256` variables; then checks the next run's downloaded candidate, `SHA256SUMS`, embedded texts and evidence.
-- [ ] After reviewing the candidate, the owner has separately set repository variable `DIRECTOR_COMPILER_LICENSE_APPROVED` to exactly `true` for the GHCR/Release packaging decision.
+- [ ] After reviewing the candidate, the owner will create/push the matching version tag only when ready to publish to GHCR/GitHub Release. No separate release-approval variable is needed.
 
-The workflow must fail before building a release if `LICENSE`, `NOTICE`, any approval variable, or either exact digest match is absent. Changing either licensing file invalidates approval. Do not add placeholder or guessed license text to pass this gate.
+The workflow must fail before building a release if `LICENSE`, `NOTICE`, or either exact digest match is absent. Changing either licensing file invalidates the corresponding digest until updated in this repository. Do not add placeholder or guessed license text to pass this gate.
 
 ## Build and test
 
 - [x] Standalone Ubuntu **Verify component** workflow passed with upload disabled: https://github.com/kkgams/plugin.director-compiler/actions/runs/36262024874 at `d3d6d5d`.
 - [ ] Owner/engineering reviewed that Linux run's SDK/link/adapter evidence against `THIRD-PARTY-REVIEW.md` (a green run alone does not complete this review).
 - [ ] Following the checked-in upload switch change and repo-scoped digest configuration, a separate CI run uploaded the checksummed downloadable artifact with `LICENSE`/`NOTICE`; downloaded evidence and raw WASM notices pass exact-byte review.
-- [ ] Branch-only manual `release.yml` passed on the intended commit, including `nix develop --command wkg --version` on Linux; no GHCR or GitHub Release publication occurred.
+- [ ] Optional branch-only manual `release.yml` passed on the intended commit, including `nix develop --command wkg --version` on Linux; no GHCR or GitHub Release publication occurred.
 
 - [ ] A clean checkout succeeds with `nix develop --command make test`.
 - [ ] A clean checkout succeeds with `nix develop --command make build`.

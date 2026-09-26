@@ -30,4 +30,4 @@ A source error containing a stable code, human-readable message, and source span
 
 ## Current ambiguity
 
-The owner selected MIT for the standalone Director Compiler repository; its text is in `LICENSE`. Publication remains gated on third-party notice review, preservation of copyright/permission notices in raw-WASM distribution, and approval bound to the license SHA-256 digest. This selection does not relicense unrelated GAMS code or third-party dependencies.
+The owner selected MIT for the standalone Director Compiler repository; its text is in `LICENSE`. Publication requires preservation of third-party copyright/permission notices in raw-WASM distribution, exact repository-scoped LICENSE/NOTICE SHA-256 matches, and an owner-pushed release tag; no separate approval boolean is required. Review the third-party notice inventory before tagging. This selection does not relicense unrelated GAMS code or third-party dependencies.

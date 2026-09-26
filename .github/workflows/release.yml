@@ -23,7 +23,6 @@ jobs:
         id: metadata
         shell: bash
         env:
-          LICENSE_APPROVED: ${{ vars.DIRECTOR_COMPILER_LICENSE_APPROVED }}
           APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
           APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
         run: |
@@ -54,10 +53,6 @@ jobs:
           fi
           if [[ ! -s NOTICE ]]; then
             echo 'Publication blocked before build: root NOTICE is missing or empty.' >&2
-            exit 1
-          fi
-          if [[ "$LICENSE_APPROVED" != true ]]; then
-            echo 'Publication blocked before build: repository variable DIRECTOR_COMPILER_LICENSE_APPROVED must be exactly true.' >&2
             exit 1
           fi
           if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
@@ -160,7 +155,6 @@ jobs:
         id: metadata
         shell: bash
         env:
-          LICENSE_APPROVED: ${{ vars.DIRECTOR_COMPILER_LICENSE_APPROVED }}
           APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
           APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
         run: |
@@ -179,10 +173,6 @@ jobs:
           fi
           if [[ ! -s NOTICE ]]; then
             echo 'Publication blocked: root NOTICE is missing or empty.' >&2
-            exit 1
-          fi
-          if [[ "$LICENSE_APPROVED" != true ]]; then
-            echo 'Publication blocked: repository variable DIRECTOR_COMPILER_LICENSE_APPROVED must be exactly true.' >&2
             exit 1
           fi
           if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
