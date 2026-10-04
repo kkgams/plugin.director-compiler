@@ -1,3 +1,14 @@
+> **Prospective v0.2.0 maintenance preparation — NOT release-ready.**
+> Target: `plugin.director-compiler` v0.2.0, `director-compiler.wasm`, `ghcr.io/kkgams/gams/director-compiler:0.2.0`.
+> Below is frozen historical documentation: existing GitHub Release URLs,
+> versioned examples and repair instructions refer to their original releases.
+> For a future v0.2.0 candidate, use the prepared distribution metadata;
+> rebuild and run repository-owned locked toolchain/runtime tests, review
+> source drift, linked evidence and exact LICENSE/NOTICE/candidate digests.
+> Migrate the direct-release publisher to draft-first immutable-policy and
+> exact public-byte verification before any tag/OCI push/Pages publication.
+> Do not run the historical publishing commands as v0.2.0 instructions.
+
 # Publishing the Director Compiler
 
 The owner selected MIT for this standalone repository. Raw-WASM notice embedding and verification are implemented. An engineering third-party audit is recorded in `THIRD-PARTY-REVIEW.md`, with full texts in root `NOTICE`. The first hosted Linux build passed; the owner must still review the documented provenance limitations and set this repository's exact licensing-file digests. Committing and pushing the release tag is the publication decision; there is no separate release-approval variable. This document records the release contract and outstanding checks. It does not itself publish.
