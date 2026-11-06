@@ -22,9 +22,6 @@ jobs:
       - name: Enforce release metadata and licensing gates before build
         id: metadata
         shell: bash
-        env:
-          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
-          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
@@ -56,32 +53,8 @@ jobs:
             echo 'Publication blocked before build: root NOTICE is missing or empty.' >&2
             exit 1
           fi
-          if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
-            echo 'Publication blocked before build: repository variable LICENSE_SHA256 is missing.' >&2
-            exit 1
-          fi
-          if [[ ! "$APPROVED_LICENSE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo 'Publication blocked before build: repository variable LICENSE_SHA256 must be a lowercase SHA-256 digest.' >&2
-            exit 1
-          fi
-          if [[ -z "$APPROVED_NOTICE_SHA256" ]]; then
-            echo 'Publication blocked before build: repository variable NOTICE_SHA256 is missing.' >&2
-            exit 1
-          fi
-          if [[ ! "$APPROVED_NOTICE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo 'Publication blocked before build: repository variable NOTICE_SHA256 must be a lowercase SHA-256 digest.' >&2
-            exit 1
-          fi
           license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
           notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
-          if [[ "$license_sha256" != "$APPROVED_LICENSE_SHA256" ]]; then
-            echo "Publication blocked before build: LICENSE digest $license_sha256 does not match LICENSE_SHA256." >&2
-            exit 1
-          fi
-          if [[ "$notice_sha256" != "$APPROVED_NOTICE_SHA256" ]]; then
-            echo "Publication blocked before build: NOTICE digest $notice_sha256 does not match NOTICE_SHA256." >&2
-            exit 1
-          fi
           {
             echo "version=$version"
             echo "wit_version=$wit_version"
@@ -155,9 +128,6 @@ jobs:
       - name: Enforce version, ref, and licensing gates
         id: metadata
         shell: bash
-        env:
-          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
-          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
@@ -176,33 +146,8 @@ jobs:
             echo 'Publication blocked: root NOTICE is missing or empty.' >&2
             exit 1
           fi
-          if [[ -z "$APPROVED_LICENSE_SHA256" ]]; then
-            echo 'Publication blocked: repository variable LICENSE_SHA256 is missing.' >&2
-            exit 1
-          fi
-          if [[ ! "$APPROVED_LICENSE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo 'Publication blocked: repository variable LICENSE_SHA256 must be a lowercase SHA-256 digest.' >&2
-            exit 1
-          fi
-          if [[ -z "$APPROVED_NOTICE_SHA256" ]]; then
-            echo 'Publication blocked: repository variable NOTICE_SHA256 is missing.' >&2
-            exit 1
-          fi
-          if [[ ! "$APPROVED_NOTICE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo 'Publication blocked: repository variable NOTICE_SHA256 must be a lowercase SHA-256 digest.' >&2
-            exit 1
-          fi
           license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
           notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
-          if [[ "$license_sha256" != "$APPROVED_LICENSE_SHA256" ]]; then
-            echo "Publication blocked: LICENSE digest $license_sha256 does not match LICENSE_SHA256." >&2
-            exit 1
-          fi
-          if [[ "$notice_sha256" != "$APPROVED_NOTICE_SHA256" ]]; then
-            echo "Publication blocked: NOTICE digest $notice_sha256 does not match NOTICE_SHA256." >&2
-            exit 1
-          fi
-
           {
             echo "version=$version"
             echo "wit_version=$wit_version"
@@ -277,8 +222,8 @@ jobs:
           Director Compiler pilot distribution **${VERSION}** exposes WIT package **gams:director-compiler@${WIT_VERSION}**.
 
           OCI artifact: \`${OCI_REF}\`
-          Owner-approved LICENSE SHA-256: \`${LICENSE_SHA256}\`
-          Owner-approved NOTICE SHA-256: \`${NOTICE_SHA256}\`
+          LICENSE SHA-256: \`${LICENSE_SHA256}\`
+          NOTICE SHA-256: \`${NOTICE_SHA256}\`
 
           This pilot does not implement every accepted Director language v1 feature. See the released language documentation for the exact implementation status, including structured value paths, nested matcher link values, matcher continuations, declaration/rule interleaving, and complete diagnostic recovery.
           EOF
@@ -288,12 +233,3 @@ jobs:
             --title "Director Compiler ${VERSION}" \
             --notes-file release-notes.md \
             "${release_assets[@]}"
-
-  deploy-docs:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: publish
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/pages.yml

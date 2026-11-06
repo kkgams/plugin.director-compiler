@@ -1,65 +1,32 @@
-name: Deploy released documentation
-
+name: Deploy documentation
 on:
+  push:
+    branches: ['release']
   workflow_dispatch:
-  workflow_call:
-
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: true
-
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/release'
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     steps:
-      - name: Check out released source
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Require a matching published release tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          version="$(tr -d '[:space:]' < version.txt)"
-          test "$GITHUB_REF" = "refs/tags/v${version}"
-          release_tag="$(gh release view "$GITHUB_REF_NAME" --json isDraft,isPrerelease,tagName \
-            --jq 'select(.isDraft == false and .isPrerelease == false) | .tagName')"
-          test "$release_tag" = "$GITHUB_REF_NAME"
-          test -f docs/_config.md
-          test -f docs/_sidebar.md
-          test "$(head -n 1 docs/director-compiler.md)" = '---'
-          test "$(head -n 1 docs/director-language.md)" = '---'
-          grep -qx 'status: in-progress' docs/director-language.md
-          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
-            echo 'Extracted documentation contains a source-repository link.' >&2
-            exit 1
-          fi
-
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0 (Node 24)
-
-      - name: Build wiki
-        id: wiki
-        uses: justgook/wiki@2b59699a9781130f481752c85329480301240ffa # v1.1.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Build pinned wiki
+        run: nix develop --command make docs
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          source: docs
-          output: .wiki-dist
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0 (Node 24 composite)
-        with:
-          path: ${{ steps.wiki.outputs.path }}
-          include-hidden-files: 'true'
-
+          path: build/site
       - name: Deploy Pages
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0 (Node 24)
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

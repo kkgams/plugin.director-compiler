@@ -1,3 +1,21 @@
+## Current tag-based release authorization
+
+Pushing the matching version tag authorizes release in this repository. No manual
+checksum variables, approval boolean, hosted-review approval, or `release`-branch
+HEAD match is required. Branch candidates still validate their payloads; they do
+not publish a GitHub Release or OCI version. Manual branch runs verify only.
+
+Repository/tag/version and WIT identity checks, build/runtime tests, source and
+build-evidence checks, nonempty LICENSE/NOTICE, exact embedded licensing bytes,
+generated SHA256SUMS, independent candidates, and GitHub Release/OCI no-overwrite
+checks remain required. The workflow uses the automatic GitHub token. Never move
+or overwrite an existing version tag. Pages publication remains independent.
+
+This policy supersedes historical approval-variable and pre-tag review/branch
+requirements below, not source provenance or legal terms. It does not claim hosted
+validation or authorize this editing session to commit, push, tag, or publish.
+No source snapshots, legal texts, or historical evidence are refreshed.
+
 > **Prospective v0.2.0 maintenance preparation — NOT release-ready.**
 > Target: `plugin.director-compiler` v0.2.0, `director-compiler.wasm`, `ghcr.io/kkgams/gams/director-compiler:0.2.0`.
 > Below is frozen historical documentation: existing GitHub Release URLs,
@@ -74,3 +92,25 @@ python3 scripts/wasm-notices.py verify dist/director-compiler.wasm --license LIC
 ```
 
 The build/tests and publication workflow verify exact embedded bytes. The engineering notice audit is in [`THIRD-PARTY-REVIEW.md`](./THIRD-PARTY-REVIEW.md). Public CI logs can supply initial Linux SDK/link evidence without distributing a WASM. The first hosted Linux run passed with uploads disabled. A downloadable Actions candidate now requires the checked-in `CI_ARTIFACT_UPLOAD_ENABLED` switch (now `true`) plus this repository's exact `LICENSE_SHA256` and `NOTICE_SHA256` variables; GHCR/GitHub Release starts only when the owner pushes the matching version tag; there is no release-approval boolean. Review the candidate and run the optional branch-only release dry run before tagging. Exact-byte licensing digests still fail closed. See [`PUBLISHING.md`](./PUBLISHING.md).
+
+## Local Project and documentation
+
+```sh
+nix develop --command make open
+make serve-docs                 # http://localhost:8080; override DOCS_PORT
+make validate-docs
+make docs                       # portable site under build/site/
+```
+
+`make open` builds the component and opens this repository's `gams.json` with
+explicit `GAMS_APP_CWD`. If absent, `tools/gams.app` is downloaded from the latest
+GAMS macOS Apple Silicon release, with its accompanying notices retained.
+An existing download is never updated implicitly; Gatekeeper is not bypassed.
+No neighboring checkout is required. First launch needs network access for the
+Project's pinned published dependencies.
+
+The local Project loads the built plugin and the published Files View to browse
+Project files. It is not a plugin-specific editor or an API/runtime test.
+The wiki uses pinned `justgook/wiki` v1.4.0, cached under ignored `build/`.
+GitHub Pages builds with `make docs` on every push to `release`, independently of
+component releases. Set Pages source to **GitHub Actions** in repository settings.

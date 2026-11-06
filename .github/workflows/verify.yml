@@ -10,24 +10,12 @@ on:
 permissions:
   contents: read
 
-# First hosted Linux build passed; candidates may be distributed only when
-# this repo's exact LICENSE_SHA256 and NOTICE_SHA256 variables also match.
-env:
-  CI_ARTIFACT_UPLOAD_ENABLED: 'true'
-
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Validate checked-in artifact distribution policy
-        run: |
-          case "$CI_ARTIFACT_UPLOAD_ENABLED" in
-            true|false) ;;
-            *) echo 'CI_ARTIFACT_UPLOAD_ENABLED must be true or false.' >&2; exit 1 ;;
-          esac
 
       - name: Validate release metadata and wiki inputs
         shell: bash
@@ -59,10 +47,7 @@ jobs:
           bash scripts/test-release-oci-preflight.sh
 
       - name: Check candidate licensing before installing the toolchain
-        if: env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
-        env:
-          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
-          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
         run: bash scripts/check-licensing-digests.sh
 
       - name: Install Nix
@@ -108,18 +93,14 @@ jobs:
           (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
 
-      # Downloadable Actions artifacts are distribution. The checked-in switch
-      # AND exact repo-scoped licensing digests must both authorize staging.
-      - name: Gate exact licensing bytes and stage CI candidate
+      # Downloadable candidates must pass exact embedded licensing checks.
+      - name: Validate exact licensing bytes and stage CI candidate
         id: candidate_gate
-        if: env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
-        env:
-          APPROVED_LICENSE_SHA256: ${{ vars.LICENSE_SHA256 }}
-          APPROVED_NOTICE_SHA256: ${{ vars.NOTICE_SHA256 }}
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
         run: bash scripts/check-artifact-approval.sh
 
-      - name: Upload checked-in-policy candidate and evidence (not a release)
-        if: steps.candidate_gate.outcome == 'success' && env.CI_ARTIFACT_UPLOAD_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
+      - name: Upload validated candidate and evidence (not a release)
+        if: steps.candidate_gate.outcome == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: director-compiler-verification-${{ github.sha }}

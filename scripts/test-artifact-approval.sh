@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+unset APPROVED APPROVED_LICENSE_SHA256 APPROVED_NOTICE_SHA256
 source_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$source_dir/check-artifact-approval.sh"
 work="$(mktemp -d)"
@@ -13,8 +14,6 @@ printf '\0asm\r\0\1\0' > dist/director-compiler.wasm
 python3 scripts/wasm-notices.py embed dist/director-compiler.wasm --license LICENSE --notice NOTICE
 checksum() { (cd dist && sha256sum director-compiler.wasm > SHA256SUMS); }
 checksum
-export APPROVED_LICENSE_SHA256="$(sha256sum LICENSE | cut -d ' ' -f 1)"
-export APPROVED_NOTICE_SHA256="$(sha256sum NOTICE | cut -d ' ' -f 1)"
 bash scripts/check-licensing-digests.sh
 reject() {
   if bash "$script" > "$work/output" 2>&1; then
@@ -22,14 +21,6 @@ reject() {
   fi
   test ! -e dist/LICENSE && test ! -e dist/NOTICE
 }
-unset APPROVED_LICENSE_SHA256
-if bash scripts/check-licensing-digests.sh > "$work/output" 2>&1; then
-  echo 'Licensing preflight accepted missing approval.' >&2; exit 1
-fi
-reject
-export APPROVED_LICENSE_SHA256="$(sha256sum LICENSE | cut -d ' ' -f 1)"
-APPROVED_LICENSE_SHA256="$(printf '0%.0s' {1..64})" reject
-APPROVED_NOTICE_SHA256="$(printf '0%.0s' {1..64})" reject
 mv NOTICE saved-notice
 reject
 mv saved-notice NOTICE
@@ -51,4 +42,4 @@ python3 scripts/wasm-notices.py embed dist/director-compiler.wasm --license LICE
 checksum
 bash "$script"
 (cd dist && sha256sum --check SHA256SUMS)
-echo 'Director CI candidate approval tests passed'
+echo 'Director CI candidate payload tests passed'

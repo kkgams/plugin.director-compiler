@@ -1,3 +1,21 @@
+## Current tag-based release authorization
+
+Pushing the matching version tag authorizes release in this repository. No manual
+checksum variables, approval boolean, hosted-review approval, or `release`-branch
+HEAD match is required. Branch candidates still validate their payloads; they do
+not publish a GitHub Release or OCI version. Manual branch runs verify only.
+
+Repository/tag/version and WIT identity checks, build/runtime tests, source and
+build-evidence checks, nonempty LICENSE/NOTICE, exact embedded licensing bytes,
+generated SHA256SUMS, independent candidates, and GitHub Release/OCI no-overwrite
+checks remain required. The workflow uses the automatic GitHub token. Never move
+or overwrite an existing version tag. Pages publication remains independent.
+
+This policy supersedes historical approval-variable and pre-tag review/branch
+requirements below, not source provenance or legal terms. It does not claim hosted
+validation or authorize this editing session to commit, push, tag, or publish.
+No source snapshots, legal texts, or historical evidence are refreshed.
+
 > **Prospective v0.2.0 maintenance preparation — NOT release-ready.**
 > Target: `plugin.director-compiler` v0.2.0, `director-compiler.wasm`, `ghcr.io/kkgams/gams/director-compiler:0.2.0`.
 > Below is frozen historical documentation: existing GitHub Release URLs,

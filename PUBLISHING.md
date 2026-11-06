@@ -1,3 +1,21 @@
+## Current tag-based release authorization
+
+Pushing the matching version tag authorizes release in this repository. No manual
+checksum variables, approval boolean, hosted-review approval, or `release`-branch
+HEAD match is required. Branch candidates still validate their payloads; they do
+not publish a GitHub Release or OCI version. Manual branch runs verify only.
+
+Repository/tag/version and WIT identity checks, build/runtime tests, source and
+build-evidence checks, nonempty LICENSE/NOTICE, exact embedded licensing bytes,
+generated SHA256SUMS, independent candidates, and GitHub Release/OCI no-overwrite
+checks remain required. The workflow uses the automatic GitHub token. Never move
+or overwrite an existing version tag. Pages publication remains independent.
+
+This policy supersedes historical approval-variable and pre-tag review/branch
+requirements below, not source provenance or legal terms. It does not claim hosted
+validation or authorize this editing session to commit, push, tag, or publish.
+No source snapshots, legal texts, or historical evidence are refreshed.
+
 > **Prospective v0.2.0 maintenance preparation — NOT release-ready.**
 > Target: `plugin.director-compiler` v0.2.0, `director-compiler.wasm`, `ghcr.io/kkgams/gams/director-compiler:0.2.0`.
 > Below is frozen historical documentation: existing GitHub Release URLs,
@@ -53,19 +71,11 @@ A manual run on a branch performs the digest-gated build and uploads a **downloa
 
 ### `pages.yml`
 
-Builds and deploys the repository-owned wiki from `docs/` for a published release. The release workflow calls it after creating the checksummed release; it does **not** also run from `release.published` (which would race/cancel the reusable Pages run). A manual run must select an existing published release tag; branch refs fail. This makes released documentation, not development-branch documentation, the default Pages deployment. The workflow uses the actual `justgook/wiki` action API: `source`, `output`, and its `path` output. Aggregate ecosystem documentation belongs elsewhere and is not implemented here.
+Builds and deploys `docs/` on every push to `release`, independently of component version tags. It runs `nix develop --command make docs` with pinned `justgook/wiki` v1.4.0 and uploads `build/site`. Manual dispatch deploys only from `release`. Component release gates are unchanged.
 
-### Repair the already-published `v0.1.0` wiki without a new component release
+### Historical v0.1.0 route repair
 
-`v0.1.0` is immutable and its published component must not be retagged or republished. Its wiki sidebar links to `#/director-compiler` and `#/director-language`, but the tagged source names the pages `index.md` and `language.md`; the language page also lacks the wiki runtime's required `status` frontmatter. The **manual** `repair-pages-v0.1.0.yml` workflow runs from `release` (the existing permitted Pages environment branch), checks out the original `v0.1.0` tag separately and verifies its exact commit and published GitHub Release. It builds that tagged Markdown with the pinned wiki action, adds only generated-site route aliases and status, then deploys **Pages only**. It does not modify the tag, upload a new component, push GHCR, or create a GitHub Release. It fails loudly if the tag/source/site shape differs from the reviewed version.
-
-After pushing this docs-only fix, the owner runs:
-
-```sh
-gh workflow run repair-pages-v0.1.0.yml -R kkgams/plugin.director-compiler --ref release
-```
-
-Once it passes, check `https://kkgams.github.io/plugin.director-compiler/#/director-language` and the Overview link. Do **not** rerun the release workflow: the existing-release safeguard must reject duplicate publication. Future version tags use the corrected canonical filenames in the source rather than this one-off repair.
+The one-off published-tag Pages repair workflow is retired. Current Pages publication uses the `release` branch and canonical source filenames through `make docs`. The historical repair script and its tests remain as evidence; no published tag or component is changed.
 
 ## Required owner setup
 
@@ -91,8 +101,8 @@ Changing either `LICENSE` or `NOTICE` invalidates candidate and release distribu
 - The component artifact has one canonical filename, `director-compiler.wasm`; the final GitHub Release SHA-256 manifest also covers `LICENSE` and applicable `NOTICE`.
 - Build/test commands are repository-local (`make test`, `make build`) and run through `nix develop` in CI.
 - Workflow actions are pinned to full reachable commits and permissions are scoped per job.
-- All four workflow files pass `actionlint` after placing the template at repository root.
-- The wiki action's v1.1.0 API and required `_config.md` / `_sidebar.md` files were checked against `justgook/wiki`'s actual `action.yml` and build script. The release-pilot smoke test exposed a routing bug: wiki links used title slugs while files were named `index.md` and `language.md`; the language page also lacked required `status` metadata. Current extraction uses `director-compiler.md` and `director-language.md`, with explicit status and matching wiki routes. A docs-only recovery workflow republishes corrected generated pages for the immutable `v0.1.0` source.
+- The remaining workflow files pass `actionlint` after placing the template at repository root.
+- The wiki action's v1.1.0 API and required `_config.md` / `_sidebar.md` files were checked against `justgook/wiki`'s actual `action.yml` and build script. The release-pilot smoke test exposed a routing bug: wiki links used title slugs while files were named `index.md` and `language.md`; the language page also lacked required `status` metadata. Current extraction uses `director-compiler.md` and `director-language.md`, with explicit status and matching wiki routes. The former docs-only recovery workflow is retired; branch-owned Pages now uses the corrected canonical source.
 
 ## Known gaps / release blockers
 
@@ -118,4 +128,4 @@ test -s dist/director-compiler.wasm
 
 The first Ubuntu **Verify component** build passed at the link above. Before pushing this change with candidate uploads enabled, the owner sets this repository's `LICENSE_SHA256` and `NOTICE_SHA256` to the approved licensing bytes. Review the SDK VERSION, toolchain, link map and adapter producer metadata printed in CI logs against `THIRD-PARTY-REVIEW.md`. On the next `release` run download the candidate/evidence, run `sha256sum --check SHA256SUMS` on its three payloads, validate the WASM and its embedded texts, and record the run URL/source commit. Build success alone is not a completed notice review.
 
-After reviewing the candidate, the owner may manually run `release.yml` **on the branch** to verify the release shell and `wkg` on hosted Linux without publishing. Complete [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md). The owner alone creates/pushes `v0.1.0` on that verified commit. Its tag workflow can push GHCR and create the GitHub Release; Pages deployment additionally requires the owner to configure the Pages environment/source. No retagging a failed pushed version to pick up later workflow fixes.
+After reviewing the candidate, the owner may manually run `release.yml` **on the branch** to verify the release shell and `wkg` on hosted Linux without publishing. Complete [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md). The owner alone creates/pushes `v0.1.0` on that verified commit. Its tag workflow can push GHCR and create the GitHub Release. Independent `release` branch Pages deployment requires the owner to configure the Pages environment/source. No retagging a failed pushed version to pick up later workflow fixes.

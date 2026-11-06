@@ -11,7 +11,7 @@ This document is a tour of the accepted Director language rather than a compiler
 
 > **Implementation status**
 >
-> The v1 language design is accepted, but its compiler is still being completed. Features marked **In progress** below are part of v1 even though `director-compiler.comp` does not compile them yet. The [implementation status](#implementation-status) section collects the current gaps in one place.
+> The v1 language design is accepted, but its compiler is still being completed. Features marked **In progress** below are part of v1 even though `director-compiler.comp` does not compile them yet. The implementation status section below collects the current gaps in one place.
 
 ## A complete example
 

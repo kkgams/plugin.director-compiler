@@ -51,4 +51,26 @@ The owner selected MIT for this repository. Release publication requires the mat
 - `director-compiler.wasm` and `SHA256SUMS` on the matching GitHub Release;
 - the same component at the exact versioned GHCR reference above.
 
-This site is deployed from release tags so its default content corresponds to an explicit released source ref. Aggregate GAMS ecosystem documentation is intentionally outside this repository.
+This site is deployed on pushes to the `release` branch, independently of component version tags. Aggregate GAMS ecosystem documentation is intentionally outside this repository.
+
+## Local Project and documentation
+
+```sh
+nix develop --command make open
+make serve-docs                 # http://localhost:8080; override DOCS_PORT
+make validate-docs
+make docs                       # portable site under build/site/
+```
+
+`make open` builds the component and opens this repository's `gams.json` with
+explicit `GAMS_APP_CWD`. If absent, `tools/gams.app` is downloaded from the latest
+GAMS macOS Apple Silicon release, with its accompanying notices retained.
+An existing download is never updated implicitly; Gatekeeper is not bypassed.
+No neighboring checkout is required. First launch needs network access for the
+Project's pinned published dependencies.
+
+The local Project loads the built plugin and the published Files View to browse
+Project files. It is not a plugin-specific editor or an API/runtime test.
+The wiki uses pinned `justgook/wiki` v1.4.0, cached under ignored `build/`.
+GitHub Pages builds with `make docs` on every push to `release`, independently of
+component releases. Set Pages source to **GitHub Actions** in repository settings.
