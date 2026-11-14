@@ -14,7 +14,9 @@ export XDG_CACHE_HOME := $(abspath build.nosync/cache)
 export PYTHONPYCACHEPREFIX := $(abspath build.nosync/pycache)
 export CARGO_TARGET_DIR := $(abspath build.nosync/runtime-target)
 ODIN_SOURCES := $(wildcard *.odin)
-WIT_SOURCES := $(wildcard wit/*.wit)
+WIT_SOURCES := $(shell find wit -type f)
+WIT_DIRS := $(shell find wit -type d)
+BUILD_CONFIG := Makefile flake.nix flake.lock
 
 .PHONY: build package test clean
 build: build.nosync/director-compiler.wasm
@@ -22,14 +24,14 @@ package: build.nosync/director-compiler.wasm build.nosync/LICENSE build.nosync/N
 
 # Test compilation is independent from release packaging.
 define component_rules
-$(1)/director_compiler_core.o.wasm: $(ODIN_SOURCES) Makefile | build.nosync/tmp
+$(1)/director_compiler_core.o.wasm: $(ODIN_SOURCES) . $(BUILD_CONFIG) | build.nosync/tmp
 	@mkdir -p "$(1)"
 	@rm -f "$$@" "$(1)/director_compiler_core.o.obj"
 	@$(ODIN) build . -target:wasi_wasm32 -build-mode:obj --no-entry-point -o:speed -out:$$@
 	@if [ -f "$(1)/director_compiler_core.o.obj" ]; then mv "$(1)/director_compiler_core.o.obj" "$$@"; fi
 	@test -f "$$@"
 
-$(1)/director-compiler.unstripped.wasm: component.c $(1)/director_compiler_core.o.wasm $(WIT_SOURCES) Makefile
+$(1)/director-compiler.unstripped.wasm: component.c $(1)/director_compiler_core.o.wasm $(WIT_SOURCES) $(WIT_DIRS) $(BUILD_CONFIG)
 	@rm -rf "$(1)/bindings"
 	@mkdir -p "$(1)/bindings"
 	@(cd "$(1)/bindings" && $(WIT_BINDGEN) c "$(abspath wit)" -w gams:director-compiler/director-compiler-plugin@1.0.0)
@@ -100,11 +102,11 @@ tools/gams.app:
 open: build tools/gams.app
 	GAMS_APP_CWD="$(CURDIR)" GAMS_CONFIG="$(CURDIR)/gams.json" ./tools/gams.app/Contents/MacOS/gams
 
-$(WIKI_MAKEFILE):
+$(WIKI_MAKEFILE): | build.nosync/tmp
 	@mkdir -p "$(@D)"
 	@set -eu; trap 'rm -f "$@.tmp"' EXIT; \
 		$(CURL) --fail --location --retry 3 "$(WIKI_REPOSITORY)/raw/$(WIKI_VERSION)/Makefile" -o "$@.tmp"; \
 		mv "$@.tmp" "$@"
 
-serve-docs validate-docs docs: $(WIKI_MAKEFILE)
+serve-docs validate-docs docs: $(WIKI_MAKEFILE) | build.nosync/tmp
 	$(MAKE) -f "$(WIKI_MAKEFILE)" "$(if $(filter docs,$@),build,$(patsubst %-docs,%,$@))" WIKI_REPOSITORY="$(WIKI_REPOSITORY)" WIKI_VERSION="$(WIKI_VERSION)" WIKI_ENGINE="$(WIKI_ENGINE)" WIKI_SOURCE="$(abspath docs)" WIKI_OUTPUT="$(abspath build.nosync/site)" PORT="$(DOCS_PORT)"
