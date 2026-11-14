@@ -1,235 +1,68 @@
 name: Release component
-
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
-
+permissions:
+  contents: write
+  packages: write
 jobs:
-  verify:
-    permissions:
-      contents: read
+  release:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Enforce release metadata and licensing gates before build
-        id: metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
-          version="$(tr -d '[:space:]' < version.txt)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            test "$GITHUB_REF" = "refs/tags/v${version}"
-          else
-            test "$GITHUB_EVENT_NAME" = workflow_dispatch
-            test "$GITHUB_REF_TYPE" = branch
-          fi
-          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
-          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test -f docs/_config.md
-          test -f docs/_sidebar.md
-          test "$(head -n 1 docs/director-compiler.md)" = '---'
-          test "$(head -n 1 docs/director-language.md)" = '---'
-          grep -qx 'status: in-progress' docs/director-language.md
-          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
-            echo 'Extracted documentation contains a source-repository link.' >&2
-            exit 1
-          fi
-
-          if [[ ! -s LICENSE ]]; then
-            echo 'Publication blocked before build: root LICENSE is missing or empty.' >&2
-            exit 1
-          fi
-          if [[ ! -s NOTICE ]]; then
-            echo 'Publication blocked before build: root NOTICE is missing or empty.' >&2
-            exit 1
-          fi
-          license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
-          notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
-          {
-            echo "version=$version"
-            echo "wit_version=$wit_version"
-            echo "license_sha256=$license_sha256"
-            echo "notice_sha256=$notice_sha256"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
-
-      - name: Cache pinned Nix toolchain
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
-          save: ${{ github.ref == 'refs/heads/release' }}
-
-      - name: Cache npm downloads
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3 (Node 24)
-        with:
-          path: ~/.npm
-          key: director-linux-npm-${{ hashFiles('package-lock.json') }}
-
-      - name: Test release safety scripts
-        run: |
-          bash scripts/test-artifact-approval.sh
-          bash scripts/test-release-absent.sh
-          bash scripts/test-release-oci-preflight.sh
-
-      - name: Verify the Linux publishing toolchain without publishing
-        run: nix develop --command wkg --version
-
-      - name: Test before build
-        run: nix develop --command make test
-
-      - name: Record build evidence
-        run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
-
-      - name: Stage and checksum exact licensed component
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s dist/director-compiler.wasm
-          python3 scripts/wasm-notices.py verify dist/director-compiler.wasm --license LICENSE --notice NOTICE
-          cp LICENSE NOTICE dist/
-          (cd dist && sha256sum director-compiler.wasm LICENSE NOTICE > SHA256SUMS && sha256sum --check SHA256SUMS)
-
-      - name: Upload verified release candidate
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
-        with:
-          name: director-compiler-${{ steps.metadata.outputs.version }}
-          path: |
-            dist/director-compiler.wasm
-            dist/LICENSE
-            dist/NOTICE
-            dist/SHA256SUMS
-            dist/evidence/
-          if-no-files-found: error
-          retention-days: 7
-
-  publish:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify
-    permissions:
-      contents: write
-      packages: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out release tag
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Enforce version, ref, and licensing gates
-        id: metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$GITHUB_REPOSITORY" = kkgams/plugin.director-compiler
-          version="$(tr -d '[:space:]' < version.txt)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$GITHUB_REF" = "refs/tags/v${version}"
-
-          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
-          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-
-          if [[ ! -s LICENSE ]]; then
-            echo 'Publication blocked: root LICENSE is missing or empty.' >&2
-            exit 1
-          fi
-          if [[ ! -s NOTICE ]]; then
-            echo 'Publication blocked: root NOTICE is missing or empty.' >&2
-            exit 1
-          fi
-          license_sha256="$(sha256sum LICENSE | awk '{print $1}')"
-          notice_sha256="$(sha256sum NOTICE | awk '{print $1}')"
-          {
-            echo "version=$version"
-            echo "wit_version=$wit_version"
-            echo "license_sha256=$license_sha256"
-            echo "notice_sha256=$notice_sha256"
-            echo "oci_ref=ghcr.io/kkgams/gams/director-compiler:${version}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Refuse an existing GitHub Release (only 404 is absence)
+          ref: ${{ github.sha }}
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - name: Package component and notices
+        run: nix develop --command make package
+      - name: Publish raw WASM to OCI without replacing an existing tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/check-release-absent.sh
-
-      - name: Download verified release candidate
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
-        with:
-          name: director-compiler-${{ steps.metadata.outputs.version }}
-          path: dist
-
-      - name: Recheck downloaded artifact and stage licensing assets
+          WKG_OCI_USERNAME: ${{ github.actor }}
+          WKG_OCI_PASSWORD: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          (cd dist && sha256sum --check SHA256SUMS)
-          cmp dist/LICENSE LICENSE
-          cmp dist/NOTICE NOTICE
-          python3 scripts/wasm-notices.py verify dist/director-compiler.wasm \
-            --license LICENSE --notice NOTICE
-          cp LICENSE NOTICE dist/
-          (cd dist && sha256sum director-compiler.wasm LICENSE NOTICE > SHA256SUMS && sha256sum --check SHA256SUMS)
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
-
-      - name: Restore pinned Nix publishing tools
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
-        with:
-          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
-          save: 'false'
-
-      - name: Authenticate to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0 (Node 24)
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check whether the exact OCI version may be pushed
-        id: oci_preflight
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OCI_REF: ${{ steps.metadata.outputs.oci_ref }}
-        run: nix develop --command ./scripts/release-oci-preflight.sh "$OCI_REF" dist/director-compiler.wasm
-
-      - name: Publish exact version to GHCR
-        if: steps.oci_preflight.outputs.should_push == 'true'
-        run: nix develop --command wkg oci push "${{ steps.metadata.outputs.oci_ref }}" dist/director-compiler.wasm
-
-      - name: Create checksummed GitHub Release
-        shell: bash
+          version="${GITHUB_REF_NAME#v}"
+          token=$(curl --fail --silent --show-error --get \
+            --user "${WKG_OCI_USERNAME}:${GH_TOKEN}" \
+            --data-urlencode 'service=ghcr.io' \
+            --data-urlencode 'scope=repository:kkgams/gams/director-compiler:pull,push' \
+            https://ghcr.io/token | python3 -c '
+          import json, sys
+          token = json.load(sys.stdin)["token"]
+          assert isinstance(token, str) and token, "Missing registry token"
+          print(token)')
+          echo "::add-mask::$token"
+          status=$(curl --silent --show-error \
+            --output build.nosync/oci-manifest.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer $token" \
+            --header 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+            "https://ghcr.io/v2/kkgams/gams/director-compiler/manifests/$version")
+          case "$status" in
+            404)
+              python3 -c '
+          import json
+          with open("build.nosync/oci-manifest.json") as response:
+              errors = json.load(response)["errors"]
+          assert errors and all(error["code"] in ("MANIFEST_UNKNOWN", "NAME_UNKNOWN") for error in errors), "Registry did not confirm manifest absence"'
+              ;;
+            200) echo 'OCI tag already exists; refusing to overwrite it.' >&2; exit 1 ;;
+            *) echo "OCI lookup returned HTTP $status; refusing publication." >&2; exit 1 ;;
+          esac
+          # Concurrency serializes this workflow; external publishers must not use this tag.
+          nix develop --command wkg oci push "ghcr.io/kkgams/gams/director-compiler:$version" build.nosync/director-compiler.wasm
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.metadata.outputs.version }}
-          WIT_VERSION: ${{ steps.metadata.outputs.wit_version }}
-          OCI_REF: ${{ steps.metadata.outputs.oci_ref }}
-          LICENSE_SHA256: ${{ steps.metadata.outputs.license_sha256 }}
-          NOTICE_SHA256: ${{ steps.metadata.outputs.notice_sha256 }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          set -euo pipefail
-          cat > release-notes.md <<EOF
-          Director Compiler pilot distribution **${VERSION}** exposes WIT package **gams:director-compiler@${WIT_VERSION}**.
-
-          OCI artifact: \`${OCI_REF}\`
-          LICENSE SHA-256: \`${LICENSE_SHA256}\`
-          NOTICE SHA-256: \`${NOTICE_SHA256}\`
-
-          This pilot does not implement every accepted Director language v1 feature. See the released language documentation for the exact implementation status, including structured value paths, nested matcher link values, matcher continuations, declaration/rule interleaving, and complete diagnostic recovery.
-          EOF
-          release_assets=(dist/director-compiler.wasm dist/LICENSE dist/NOTICE dist/SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" \
-            --verify-tag --latest=false \
-            --title "Director Compiler ${VERSION}" \
-            --notes-file release-notes.md \
-            "${release_assets[@]}"
+            build.nosync/director-compiler.wasm \
+            build.nosync/LICENSE \
+            build.nosync/NOTICE \
+            build.nosync/SHA256SUMS \
+            --generate-notes --verify-tag

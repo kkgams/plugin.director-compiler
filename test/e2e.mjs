@@ -2,29 +2,17 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
-import { directorCompiler } from '../build/jco/director-compiler.js'
+import { spawnSync } from 'node:child_process'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
 
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize)
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, child]) => [
-      key.replaceAll(/[A-Z]/g, letter => `-${letter.toLowerCase()}`),
-      canonicalize(child),
-    ]))
-  }
-  return value
-}
-
 function invokeCompiler(source) {
-  try {
-    return { ok: directorCompiler.compile(source) }
-  } catch (error) {
-    assert.ok(Array.isArray(error.payload), `unexpected component trap: ${error.stack}`)
-    return { err: canonicalize(error.payload) }
-  }
+  const result = spawnSync(process.env.DIRECTOR_TEST_RUNNER, [process.env.DIRECTOR_COMPONENT_PATH], {
+    input: source, encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stderr || String(result.error))
+  return JSON.parse(result.stdout)
 }
 
 const result = invokeCompiler('  # an empty Director document\n\n')

@@ -1,5 +1,5 @@
 {
-  description = "GAMS Director compiler component 0.2.0";
+  description = "GAMS Director compiler component toolchain";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
@@ -167,7 +167,7 @@
           };
         in {
           default = pkgs.mkShell {
-            packages = [ odin wasm-tools wit-bindgen wkg wasi-sdk pkgs.nodejs_24 pkgs.gnumake pkgs.coreutils pkgs.python3 pkgs.curl pkgs.bash ];
+            packages = [ odin wasm-tools wit-bindgen wkg wasi-sdk pkgs.cargo pkgs.rustc pkgs.nodejs_24 pkgs.gnumake pkgs.coreutils pkgs.python3 pkgs.curl pkgs.bash ];
             shellHook = ''
               export WASI_SDK_PATH="${wasi-sdk}"
               export WASI_SYSROOT="$WASI_SDK_PATH/share/wasi-sysroot"

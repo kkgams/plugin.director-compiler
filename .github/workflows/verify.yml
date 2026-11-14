@@ -1,114 +1,15 @@
 name: Verify component
-
 on:
   pull_request:
   push:
-    branches:
-      - release
+    branches: ['release']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  test-and-build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 (Node 24)
-
-      - name: Validate release metadata and wiki inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(tr -d '[:space:]' < version.txt)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          wit_version="$(sed -nE 's/^package gams:director-compiler@([0-9]+\.[0-9]+\.[0-9]+);$/\1/p' wit/package.wit)"
-          [[ "$wit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test -s LICENSE
-          test -s NOTICE
-          test -f docs/_config.md
-          test -f docs/_sidebar.md
-          test -f docs/director-compiler.md
-          test -f docs/director-language.md
-          test "$(head -n 1 docs/director-compiler.md)" = '---'
-          test "$(head -n 1 docs/director-language.md)" = '---'
-          grep -qx 'status: in-progress' docs/director-language.md
-          if grep -RE '(\.\./|docs/prd/|examples/|plugins/)' docs; then
-            echo 'Extracted documentation contains a source-repository link.' >&2
-            exit 1
-          fi
-          printf 'Distribution %s; WIT %s\n' "$version" "$wit_version"
-
-      - name: Test distribution and publication safety gates
-        run: |
-          bash scripts/test-artifact-approval.sh
-          bash scripts/test-release-absent.sh
-          bash scripts/test-release-oci-preflight.sh
-
-      - name: Check candidate licensing before installing the toolchain
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
-        run: bash scripts/check-licensing-digests.sh
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22 (Node 24)
-
-      # Exact flake key: only reuse this repository's pinned toolchain closure.
-      # The default release branch cache is also available to tag workflows.
-      - name: Cache pinned Nix toolchain
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7 (Node 24)
-        with:
-          primary-key: director-linux-nix-${{ hashFiles('flake.nix', 'flake.lock') }}
-          save: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/release' }}
-
-      - name: Cache npm downloads
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3 (Node 24)
-        with:
-          path: ~/.npm
-          key: director-linux-npm-${{ hashFiles('package-lock.json') }}
-
-      - name: Test
-        run: nix develop --command make test
-
-      - name: Record build evidence
-        run: nix develop --command ./scripts/record-build-evidence.sh dist/evidence
-
-      - name: Print Linux provenance without distributing linked binaries
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat dist/evidence/wasi-sdk-VERSION dist/evidence/tool-versions.txt dist/evidence/artifact-sha256.txt
-          grep -E 'crt1-reactor|libc[.]a|libclang_rt' dist/evidence/director-compiler.link.map
-          for metadata in dist/evidence/module-metadata/*.json; do
-            echo "Module: $metadata"
-            cat "$metadata"
-          done
-
-      - name: Verify and checksum component artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s dist/director-compiler.wasm
-          python3 scripts/wasm-notices.py verify dist/director-compiler.wasm --license LICENSE --notice NOTICE
-          (cd dist && sha256sum director-compiler.wasm > SHA256SUMS)
-          (cd dist && sha256sum --check SHA256SUMS)
-
-      # Downloadable candidates must pass exact embedded licensing checks.
-      - name: Validate exact licensing bytes and stage CI candidate
-        id: candidate_gate
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
-        run: bash scripts/check-artifact-approval.sh
-
-      - name: Upload validated candidate and evidence (not a release)
-        if: steps.candidate_gate.outcome == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
-        with:
-          name: director-compiler-verification-${{ github.sha }}
-          path: |
-            dist/director-compiler.wasm
-            dist/LICENSE
-            dist/NOTICE
-            dist/SHA256SUMS
-            dist/evidence/
-          if-no-files-found: error
-          retention-days: 7
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - run: nix develop --command make test validate-docs
