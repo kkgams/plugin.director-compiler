@@ -23,6 +23,6 @@ Install Nix, then run native commands with `nix develop --command make <target>`
 | `make serve-docs` | Serve pinned wiki; independent `DOCS_PORT` defaults to 8080. |
 | `make docs` | Build documentation into `build.nosync/site/`. |
 | `make validate-docs` | Validate documentation links and metadata. |
-| `make clean` | Remove known generated build, docs and marked downloads; preserve supplied tools/Units and unidentified legacy output. |
+| `make clean` | Remove all of `build.nosync/`, `tools/` and `gams_modules/`, including unmarked contents; refuse tracked files and symlinks before deleting anything. |
 
 The Host downloads only when absent and retains its release notices. Existing tools are not updated implicitly. The local Project is a Files View preview, not a compiler editor or runtime test. GUI interaction is not covered by the native suite.
