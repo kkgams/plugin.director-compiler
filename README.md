@@ -16,6 +16,7 @@ Install Nix, then run native commands with `nix develop --command make <target>`
 
 | Command | Purpose |
 | --- | --- |
+| `make compile_commands.json` | Generate clangd metadata and required bindings under `build.nosync/`, without compiling the component; rerun with `make -B compile_commands.json` after compiler/environment overrides. |
 | `make build` | Compile the component under `build.nosync/`. |
 | `make package` | Build raw WASM, full LICENSE/NOTICE and SHA256SUMS; unchanged output does no work. |
 | `make test` | Compile a separate test component and run all Director behavioral assertions through native Wasmtime. |

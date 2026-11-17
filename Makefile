@@ -18,9 +18,11 @@ WIT_SOURCES := $(shell find wit -type f)
 WIT_DIRS := $(shell find wit -type d)
 BUILD_CONFIG := Makefile flake.nix flake.lock
 
-.PHONY: build package test clean
+.PHONY: build package test clean compile_commands.json
 build: build.nosync/director-compiler.wasm
 package: build.nosync/director-compiler.wasm build.nosync/LICENSE build.nosync/NOTICE build.nosync/SHA256SUMS
+
+component_compile_flags = -I$(1)/bindings -O2 -DNDEBUG
 
 # Test compilation is independent from release packaging.
 define component_rules
@@ -31,11 +33,13 @@ $(1)/director_compiler_core.o.wasm: $(ODIN_SOURCES) . $(BUILD_CONFIG) | build.no
 	@if [ -f "$(1)/director_compiler_core.o.obj" ]; then mv "$(1)/director_compiler_core.o.obj" "$$@"; fi
 	@test -f "$$@"
 
-$(1)/director-compiler.unstripped.wasm: component.c $(1)/director_compiler_core.o.wasm $(WIT_SOURCES) $(WIT_DIRS) $(BUILD_CONFIG)
+$(1)/bindings/director_compiler_plugin.h $(1)/bindings/director_compiler_plugin.c $(1)/bindings/director_compiler_plugin_component_type.o &: $(WIT_SOURCES) $(WIT_DIRS) $(BUILD_CONFIG) | build.nosync/tmp
 	@rm -rf "$(1)/bindings"
 	@mkdir -p "$(1)/bindings"
 	@(cd "$(1)/bindings" && $(WIT_BINDGEN) c "$(abspath wit)" -w gams:director-compiler/director-compiler-plugin@1.0.0)
-	@$(WASI_P2_CC) -o "$$@" -mexec-model=reactor -I"$(1)/bindings" -O2 -DNDEBUG \
+
+$(1)/director-compiler.unstripped.wasm: component.c $(1)/director_compiler_core.o.wasm $(1)/bindings/director_compiler_plugin.h $(1)/bindings/director_compiler_plugin.c $(1)/bindings/director_compiler_plugin_component_type.o $(BUILD_CONFIG)
+	@$(WASI_P2_CC) -o "$$@" -mexec-model=reactor $(call component_compile_flags,$(1)) \
 		"$(1)/bindings/director_compiler_plugin.c" component.c "$(1)/director_compiler_core.o.wasm" \
 		"$(1)/bindings/director_compiler_plugin_component_type.o" -Wl,--strip-all
 
@@ -47,6 +51,11 @@ $(1)/director-compiler.wasm: $(1)/director-compiler.stripped.wasm LICENSE NOTICE
 endef
 $(eval $(call component_rules,build.nosync))
 $(eval $(call component_rules,build.nosync/test))
+
+compile_commands.json: build.nosync/compile_commands.json
+
+build.nosync/compile_commands.json: component.c build.nosync/bindings/director_compiler_plugin.h build.nosync/bindings/director_compiler_plugin.c scripts/compile-commands.py $(BUILD_CONFIG) | build.nosync/tmp
+	@$(PYTHON) scripts/compile-commands.py "$(WASI_P2_CC)" $(call component_compile_flags,build.nosync) -- component.c build.nosync/bindings/director_compiler_plugin.c > "$@"
 
 build.nosync/tmp:
 	@mkdir -p "$@"
