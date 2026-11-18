@@ -12,14 +12,14 @@ Text_Ref :: struct {
 }
 
 Entity_Source :: struct {
-	name:         Text_Ref,
-	tag_offset:   int,
-	tag_count:    int,
-	stat_offset:  int,
-	stat_count:   int,
-	link_offset:  int,
-	link_count:   int,
-	removed:      bool,
+	name:        Text_Ref,
+	tag_offset:  int,
+	tag_count:   int,
+	stat_offset: int,
+	stat_count:  int,
+	link_offset: int,
+	link_count:  int,
+	removed:     bool,
 }
 
 Stat_Source :: struct {
@@ -77,7 +77,13 @@ compile_entities :: proc(source: []u8) -> bool {
 
 		if source[first] == '.' {
 			if current_entity < 0 {
-				add_simple_diagnostic("parse-orphan-continuation", "property continuation has no preceding expression", first, first + 1, line)
+				add_simple_diagnostic(
+					"parse-orphan-continuation",
+					"property continuation has no preceding expression",
+					first,
+					first + 1,
+					line,
+				)
 				return false
 			}
 			if !parse_entity_properties(current_entity, first, content_end, line) {
@@ -88,7 +94,13 @@ compile_entities :: proc(source: []u8) -> bool {
 		}
 
 		if first != line_start {
-			add_simple_diagnostic("parse-unexpected-indentation", "indented expression is valid only inside IF or DO", first, content_end, line)
+			add_simple_diagnostic(
+				"parse-unexpected-indentation",
+				"indented expression is valid only inside IF or DO",
+				first,
+				content_end,
+				line,
+			)
 			return false
 		}
 		if starts_rule_keyword(source[first:content_end]) {
@@ -98,7 +110,13 @@ compile_entities :: proc(source: []u8) -> bool {
 			return parse_rules_from(first, line)
 		}
 		if entity_count >= MAX_ENTITIES {
-			add_simple_diagnostic("semantic-unrepresentable-ir", "entity limit exceeded", first, content_end, line)
+			add_simple_diagnostic(
+				"semantic-unrepresentable-ir",
+				"entity limit exceeded",
+				first,
+				content_end,
+				line,
+			)
 			return false
 		}
 
@@ -110,23 +128,35 @@ compile_entities :: proc(source: []u8) -> bool {
 		}
 		name, after_name, ok := parse_entity_identifier(name_start, content_end)
 		if !ok {
-			add_simple_diagnostic("parse-unexpected-token", "expected entity identifier", name_start, content_end, line)
+			add_simple_diagnostic(
+				"parse-unexpected-token",
+				"expected entity identifier",
+				name_start,
+				content_end,
+				line,
+			)
 			return false
 		}
 		for i in 0 ..< entity_count {
 			if text_equal_fold(entities[i].name, name) {
-				add_simple_diagnostic("semantic-duplicate-entity", "duplicate entity declaration", name.start, name.end, line)
+				add_simple_diagnostic(
+					"semantic-duplicate-entity",
+					"duplicate entity declaration",
+					name.start,
+					name.end,
+					line,
+				)
 				return false
 			}
 		}
 
 		current_entity = entity_count
 		entities[entity_count] = Entity_Source {
-			name = name,
-			tag_offset = tag_count,
+			name        = name,
+			tag_offset  = tag_count,
 			stat_offset = stat_count,
 			link_offset = link_count,
-			removed = removed,
+			removed     = removed,
 		}
 		entity_count += 1
 		pos := skip_horizontal_space(after_name, content_end)
@@ -157,19 +187,37 @@ parse_entity_properties :: proc(entity_index, start, end: int, line: u32) -> boo
 			return true
 		}
 		if compiler_source[pos] != '.' {
-			add_simple_diagnostic("parse-unexpected-token", "expected '.' before entity property", pos, pos + 1, line)
+			add_simple_diagnostic(
+				"parse-unexpected-token",
+				"expected '.' before entity property",
+				pos,
+				pos + 1,
+				line,
+			)
 			return false
 		}
 		pos += 1
 		pos = skip_horizontal_space(pos, end)
 		property, next, ok := parse_property_identifier(pos, end)
 		if !ok {
-			add_simple_diagnostic("parse-unexpected-token", "expected property name", pos, min(pos + 1, end), line)
+			add_simple_diagnostic(
+				"parse-unexpected-token",
+				"expected property name",
+				pos,
+				min(pos + 1, end),
+				line,
+			)
 			return false
 		}
 		word := intern_word(property)
 		if word < 0 {
-			add_simple_diagnostic("semantic-unrepresentable-ir", "word limit exceeded", property.start, property.end, line)
+			add_simple_diagnostic(
+				"semantic-unrepresentable-ir",
+				"word limit exceeded",
+				property.start,
+				property.end,
+				line,
+			)
 			return false
 		}
 		pos = skip_horizontal_space(next, end)
@@ -177,37 +225,74 @@ parse_entity_properties :: proc(entity_index, start, end: int, line: u32) -> boo
 			pos += 1
 			pos = skip_horizontal_space(pos, end)
 			if pos >= end {
-				add_simple_diagnostic("parse-unexpected-token", "expected value after '='", pos, pos, line)
+				add_simple_diagnostic(
+					"parse-unexpected-token",
+					"expected value after '='",
+					pos,
+					pos,
+					line,
+				)
 				return false
 			}
 			value, value_end, number_ok := parse_i32(pos, end)
 			if number_ok {
 				if stat_count >= MAX_STATS {
-					add_simple_diagnostic("semantic-unrepresentable-ir", "stat limit exceeded", property.start, property.end, line)
+					add_simple_diagnostic(
+						"semantic-unrepresentable-ir",
+						"stat limit exceeded",
+						property.start,
+						property.end,
+						line,
+					)
 					return false
 				}
-				stats[stat_count] = Stat_Source {key = word, value = value}
+				stats[stat_count] = Stat_Source {
+					key   = word,
+					value = value,
+				}
 				stat_count += 1
 				entities[entity_index].stat_count += 1
 				pos = value_end
 			} else {
 				target, target_end, target_ok := parse_entity_identifier(pos, end)
 				if !target_ok {
-					add_simple_diagnostic("parse-unexpected-token", "expected integer or entity link target", pos, min(pos + 1, end), line)
+					add_simple_diagnostic(
+						"parse-unexpected-token",
+						"expected integer or entity link target",
+						pos,
+						min(pos + 1, end),
+						line,
+					)
 					return false
 				}
 				if link_count >= MAX_LINKS {
-					add_simple_diagnostic("semantic-unrepresentable-ir", "link limit exceeded", property.start, property.end, line)
+					add_simple_diagnostic(
+						"semantic-unrepresentable-ir",
+						"link limit exceeded",
+						property.start,
+						property.end,
+						line,
+					)
 					return false
 				}
-				links[link_count] = Link_Source {key = word, target_name = target, target = -1}
+				links[link_count] = Link_Source {
+					key         = word,
+					target_name = target,
+					target      = -1,
+				}
 				link_count += 1
 				entities[entity_index].link_count += 1
 				pos = target_end
 			}
 		} else {
 			if tag_count >= MAX_TAGS {
-				add_simple_diagnostic("semantic-unrepresentable-ir", "tag limit exceeded", property.start, property.end, line)
+				add_simple_diagnostic(
+					"semantic-unrepresentable-ir",
+					"tag limit exceeded",
+					property.start,
+					property.end,
+					line,
+				)
 				return false
 			}
 			tags[tag_count] = word
@@ -216,7 +301,13 @@ parse_entity_properties :: proc(entity_index, start, end: int, line: u32) -> boo
 		}
 		pos = skip_horizontal_space(pos, end)
 		if pos < end && compiler_source[pos] != '.' {
-			add_simple_diagnostic("parse-unexpected-token", "unexpected text after entity property", pos, pos + 1, line)
+			add_simple_diagnostic(
+				"parse-unexpected-token",
+				"unexpected text after entity property",
+				pos,
+				pos + 1,
+				line,
+			)
 			return false
 		}
 	}
@@ -234,7 +325,13 @@ resolve_entity_links :: proc() -> bool {
 		}
 		if found < 0 {
 			line := line_for_offset(links[i].target_name.start)
-			add_simple_diagnostic("semantic-unknown-entity", "unknown entity reference", links[i].target_name.start, links[i].target_name.end, line)
+			add_simple_diagnostic(
+				"semantic-unknown-entity",
+				"unknown entity reference",
+				links[i].target_name.start,
+				links[i].target_name.end,
+				line,
+			)
 			return false
 		}
 		links[i].target = found
@@ -266,7 +363,12 @@ intern_canonical_word :: proc(text: Text_Ref, quoted: bool) -> int {
 	return result
 }
 
-canonical_text_equal :: proc(left: Text_Ref, left_quoted: bool, right: Text_Ref, right_quoted: bool) -> bool {
+canonical_text_equal :: proc(
+	left: Text_Ref,
+	left_quoted: bool,
+	right: Text_Ref,
+	right_quoted: bool,
+) -> bool {
 	left_pos, right_pos := left.start, right.start
 	for {
 		left_byte, left_next, left_ok := canonical_text_next(left, left_quoted, left_pos)
@@ -294,7 +396,7 @@ parse_entity_identifier :: proc(start, end: int) -> (Text_Ref, int, bool) {
 	for pos < end && is_entity_identifier_byte(compiler_source[pos]) {
 		pos += 1
 	}
-	return Text_Ref {start = start, end = pos}, pos, true
+	return Text_Ref{start = start, end = pos}, pos, true
 }
 
 parse_property_identifier :: proc(start, end: int) -> (Text_Ref, int, bool) {
@@ -305,7 +407,7 @@ parse_property_identifier :: proc(start, end: int) -> (Text_Ref, int, bool) {
 	for pos < end && is_property_name_byte(compiler_source[pos]) {
 		pos += 1
 	}
-	return Text_Ref {start = start, end = pos}, pos, true
+	return Text_Ref{start = start, end = pos}, pos, true
 }
 
 parse_i32 :: proc(start, end: int) -> (i32, int, bool) {
@@ -337,7 +439,8 @@ text_equal_fold :: proc(left, right: Text_Ref) -> bool {
 		return false
 	}
 	for i in 0 ..< left.end - left.start {
-		if ascii_lower(compiler_source[left.start + i]) != ascii_lower(compiler_source[right.start + i]) {
+		if ascii_lower(compiler_source[left.start + i]) !=
+		   ascii_lower(compiler_source[right.start + i]) {
 			return false
 		}
 	}
@@ -435,8 +538,14 @@ is_ascii_alpha :: proc(byte: u8) -> bool {
 }
 
 is_entity_identifier_byte :: proc(byte: u8) -> bool {
-	return is_ascii_alpha(byte) || (byte >= '0' && byte <= '9') ||
-	       byte == '_' || byte == '-' || byte == ':' || byte == '+'
+	return(
+		is_ascii_alpha(byte) ||
+		(byte >= '0' && byte <= '9') ||
+		byte == '_' ||
+		byte == '-' ||
+		byte == ':' ||
+		byte == '+' \
+	)
 }
 
 is_property_start_byte :: proc(byte: u8) -> bool {

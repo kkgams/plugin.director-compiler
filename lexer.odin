@@ -88,17 +88,38 @@ scan_source :: proc(source: []u8) {
 }
 
 is_source_byte :: proc(byte: u8) -> bool {
-	return (byte >= 'a' && byte <= 'z') ||
-	       (byte >= 'A' && byte <= 'Z') ||
-	       (byte >= '0' && byte <= '9') ||
-	       byte == ' ' || byte == '\t' || byte == '\r' ||
-	       byte == '_' || byte == '-' || byte == ':' || byte == '+' ||
-	       byte == '.' || byte == '*' || byte == '$' || byte == '!' ||
-	       byte == '=' || byte == '<' || byte == '>' ||
-	       byte == '(' || byte == ')'
+	return(
+		(byte >= 'a' && byte <= 'z') ||
+		(byte >= 'A' && byte <= 'Z') ||
+		(byte >= '0' && byte <= '9') ||
+		byte == ' ' ||
+		byte == '\t' ||
+		byte == '\r' ||
+		byte == '_' ||
+		byte == '-' ||
+		byte == ':' ||
+		byte == '+' ||
+		byte == '.' ||
+		byte == '*' ||
+		byte == '$' ||
+		byte == '!' ||
+		byte == '=' ||
+		byte == '<' ||
+		byte == '>' ||
+		byte == '(' ||
+		byte == ')' \
+	)
 }
 
-scan_quoted_signal :: proc(source: []u8, start_index: int, start_line, start_column: u32) -> (int, u32, u32) {
+scan_quoted_signal :: proc(
+	source: []u8,
+	start_index: int,
+	start_line, start_column: u32,
+) -> (
+	int,
+	u32,
+	u32,
+) {
 	i := start_index + 1
 	line := start_line
 	column := start_column + 1
@@ -167,9 +188,12 @@ scan_quoted_signal :: proc(source: []u8, start_index: int, start_line, start_col
 }
 
 is_property_identifier_byte :: proc(byte: u8) -> bool {
-	return (byte >= 'a' && byte <= 'z') ||
-	       (byte >= 'A' && byte <= 'Z') ||
-	       byte == '_' || byte == ':'
+	return(
+		(byte >= 'a' && byte <= 'z') ||
+		(byte >= 'A' && byte <= 'Z') ||
+		byte == '_' ||
+		byte == ':' \
+	)
 }
 
 integer_exceeds_i32 :: proc(digits: []u8, negative: bool) -> bool {
@@ -210,11 +234,7 @@ utf8_sequence_width :: proc(source: []u8, index: int) -> int {
 }
 
 position :: proc(byte_offset: int, line, column: u32) -> Source_Position {
-	return Source_Position {
-		byte_offset = u32(byte_offset),
-		line = line,
-		column = column,
-	}
+	return Source_Position{byte_offset = u32(byte_offset), line = line, column = column}
 }
 
 add_diagnostic :: proc(code, message: string, start, end: Source_Position) {
@@ -224,7 +244,7 @@ add_diagnostic :: proc(code, message: string, start, end: Source_Position) {
 	diagnostics[diagnostic_count] = Diagnostic {
 		code = code,
 		message = message,
-		span = Source_Span {start = start, end = end},
+		span = Source_Span{start = start, end = end},
 	}
 	diagnostic_count += 1
 }

@@ -1,7 +1,7 @@
 package director_compiler
 
-import mem "core:mem"
 import runtime "base:runtime"
+import mem "core:mem"
 
 OUTPUT_CAPACITY :: 2 * 1024 * 1024
 
@@ -53,4 +53,3 @@ source_slice :: proc(ptr: rawptr, count: uintptr) -> []u8 {
 	}
 	return mem.slice_ptr(cast(^u8)ptr, int(count))
 }
-
